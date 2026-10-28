@@ -11,8 +11,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <title>Odd One Out v1.3.2 — Fast Word Game</title>
-  <link rel="stylesheet" href="./styles.css?v=1.3.2">
+  <title>Odd One Out v1.3.6 — Fast Word Game</title>
+  <link rel="stylesheet" href="./styles.css?v=1.3.6">
 
   <!-- GOOGLE ADSENSE (H5 GAMES ADS API) -->
   <script async
@@ -36,11 +36,18 @@
 <main class="app">
   <div class="float-feedback" id="floatFeedback" aria-live="polite">+10 ⚡</div>
 
-  <!-- CENTER SPARKS ZAP PILL (Juicy, non-bulky center feedback that pops & zaps to balance) -->
-  <div class="center-zap-pill hidden" id="centerZapPill" aria-live="assertive">
-    <span class="zap-icon" id="zapIcon">⚡</span>
-    <span class="zap-label" id="zapLabel">+12</span>
-    <span class="zap-sub" id="zapSub"></span>
+  <!-- CENTER SPARK PLUS BUBBLE (Exact Middle of Screen — Non-Bulky Arcade Feedback) -->
+  <div class="win-feedback spark-bubble-overlay hidden" id="winFeedback" aria-live="assertive">
+    <div class="win-spark-pill spark-plus-bubble" id="winSparkPill">
+      <div class="spark-bubble-main">
+        <span class="win-spark-icon spark-bubble-icon" id="winSparkIcon">⚡</span>
+        <span class="win-spark-value spark-bubble-value" id="winSparkValue">+10</span>
+        <span class="win-spark-badge spark-bubble-badge" id="winSparkBadge"></span>
+      </div>
+      <div class="win-theme-row spark-bubble-theme-row">
+        <strong class="win-theme-name spark-bubble-theme" id="winThemeName">PRIMARY COLORS</strong>
+      </div>
+    </div>
   </div>
 
   <!-- HOME SCREEN -->
@@ -50,92 +57,85 @@
       <button class="pack-bar-btn" onclick="app.clearDuel()">CLEAR</button>
     </div>
 
-    <!-- HERO WITH INLINE SPARKS, TITLE & SETTINGS -->
-    <div class="hero home-hero">
-      <div class="hero-top-row">
-        <!-- Sparks balance on the left -->
-        <button class="coins hero-coins" id="coinsPill" onclick="app.handleHeaderNav('themes')" title="Sparks Balance">
-          ⚡ <span id="coins">0</span>
-        </button>
+    <!-- 1. TOP NAV BAR (Sparks & Settings) -->
+    <div class="home-top-nav">
+      <!-- Sparks balance on the left -->
+      <button class="coins hero-coins" id="coinsPill" onclick="app.handleHeaderNav('themes')" title="Sparks Balance">
+        ⚡ <span id="coins">0</span>
+      </button>
 
-        <!-- Centered FIND THE inline with the left/right icons -->
-        <span class="hero-find-the">FIND THE</span>
-
-        <!-- Themes & Settings icons on the right -->
-        <div class="hero-actions">
-          <button class="icon-btn" onclick="app.handleHeaderNav('packs')" aria-label="Packs and Cosmetics Shop" title="Packs & Cosmetics">🎨</button>
-          <button class="icon-btn" id="settingsBtn" onclick="app.openSettings()" aria-label="Settings and Pause" title="Settings">⚙️</button>
-        </div>
-      </div>
-      <h1 class="hero-title-main">ODD ONE OUT.</h1>
-      <p class="sub">Find the <span class="color-word">word</span> that does <b class="color-not">NOT</b> belong before <span class="color-time">time runs out</span>.</p>
-    </div>
-
-    <!-- 3 STATS IN HORIZONTAL GRID -->
-    <div class="stats-grid-3">
-      <div class="stat-card" title="Your highest consecutive streak record">
-        <span class="stat-card-icon">🏆</span>
-        <div class="stat-card-info">
-          <span class="stat-card-label">BEST</span>
-          <b class="stat-card-value" id="homeBest">0</b>
-        </div>
-      </div>
-
-      <div class="stat-card" onclick="app.startDailyTarget()" style="cursor:pointer;" title="Consecutive days played. Tap to jump into today's Daily Challenge!">
-        <span class="stat-card-icon">🔥</span>
-        <div class="stat-card-info">
-          <span class="stat-card-label">DAILY</span>
-          <b class="stat-card-value" id="homeDailyStreak">0🔥</b>
-        </div>
-      </div>
-
-      <div class="stat-card" onclick="app.openShop('packs')" style="cursor:pointer;" title="Active prompt cards. Tap to toggle topics!">
-        <span class="stat-card-icon">📚</span>
-        <div class="stat-card-info">
-          <span class="stat-card-label">ACTIVE</span>
-          <b class="stat-card-value" id="homePackCount">1,260</b>
-        </div>
+      <!-- Settings icon on the right -->
+      <div class="home-nav-actions">
+        <button class="icon-btn" id="settingsBtn" onclick="app.openSettings()" aria-label="Settings and Pause" title="Settings">⚙️</button>
       </div>
     </div>
 
-    <!-- SELECTION BARS (2-COL ROW) -->
-    <div class="home-bars-row">
-      <button class="pack-bar" onclick="app.openShop('packs')" type="button">
-        <span class="pack-bar-label">
-          <span class="pack-bar-prefix">TOPICS</span>
-          <strong class="pack-bar-value" id="activePackName">3 Topics (1,260)</strong>
-        </span>
-        <span class="pack-bar-chip">▸</span>
+    <!-- 2. HERO BRAND (Centered, cohesive, uncluttered) -->
+    <div class="home-brand">
+      <span class="home-brand-eyebrow">FIND THE</span>
+      <h1 class="home-brand-title">ODD ONE OUT<span class="brand-dot">.</span></h1>
+      <p class="home-brand-sub">Find the <span class="color-word">word</span> that does <b class="color-not">NOT</b> belong before <span class="color-time">time runs out</span>.</p>
+    </div>
+
+    <!-- 3. LARGER VERTICAL LIST (BEST, DAILY, ACTIVE, & TIMER PACE) -->
+    <div class="stats-vertical-list">
+      <!-- Row 1: Best Streak Record -->
+      <div class="stat-card-row" title="Your highest consecutive streak record">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">🏆</span>
+          <span class="stat-row-label">BEST STREAK</span>
+        </div>
+        <div class="stat-row-right">
+          <b class="stat-card-val" id="homeBest">0</b>
+        </div>
+      </div>
+
+      <!-- Row 2: Daily Streak -->
+      <button class="stat-card-row" onclick="app.startDailyTarget()" type="button" title="Consecutive days played. Tap to jump into today's Daily Challenge!">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">🔥</span>
+          <span class="stat-row-label">DAILY STREAK <span class="badge-dot" id="dailyDot"></span></span>
+        </div>
+        <div class="stat-row-right">
+          <b class="stat-card-val" id="homeDailyStreak">0🔥</b>
+          <span class="stat-row-chevron">▸</span>
+        </div>
       </button>
 
-      <button class="pack-bar pace-bar" id="homePaceBar" onclick="app.cycleTimerPace()" type="button" aria-label="Timer Mode Pace">
-        <span class="pack-bar-label">
-          <span class="pack-bar-prefix">TIMER PACE</span>
-          <strong class="pack-bar-value" id="homePaceLabel">PROGRESSIVE (12s)</strong>
-        </span>
-        <span class="pack-bar-chip" id="homePaceChip">▸</span>
+      <!-- Row 3: Active Topics Pool -->
+      <button class="stat-card-row pack-bar" id="homePackBar" onclick="app.openShop('packs')" type="button" aria-label="Select Topic Packs">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">📚</span>
+          <span class="stat-row-label">ACTIVE TOPICS</span>
+        </div>
+        <div class="stat-row-right">
+          <strong class="stat-card-val pack-bar-value" id="activePackName">3 Topics (1,260)</strong>
+          <span class="stat-row-chevron">▸</span>
+        </div>
+        <span class="hidden" id="homePackCount" style="display:none;">1,260</span>
+      </button>
+
+      <!-- Row 4: Timer Pace -->
+      <button class="stat-card-row pack-bar pace-bar" id="homePaceBar" onclick="app.cycleTimerPace()" type="button" aria-label="Cycle Timer Mode">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">⏱️</span>
+          <span class="stat-row-label">TIMER PACE</span>
+        </div>
+        <div class="stat-row-right">
+          <strong class="stat-card-val pack-bar-value" id="homePaceLabel">PROGRESSIVE (12s)</strong>
+          <span class="stat-row-chevron pack-bar-chip" id="homePaceChip">▸</span>
+        </div>
       </button>
     </div>
 
-    <!-- PRIMARY PLAY BUTTON -->
-    <button class="primary" id="playQuickBtn" onclick="app.startQuickShot()">START (1,260 PROMPTS)</button>
+    <!-- 4. PRIMARY PLAY CTA & 2X SPARKS BUTTON (Appears right by Start!) -->
+    <div class="home-cta-group">
+      <!-- Primary Big Start Button -->
+      <button class="primary hero-play-btn" id="playQuickBtn" onclick="app.startQuickShot()">
+        START (1,260 PROMPTS)
+      </button>
 
-    <!-- 3 BOTTOM MODE BUTTONS -->
-    <div class="mode-row mode-row-3">
-      <button class="secondary" onclick="app.startDailyTarget()">
-        <span class="badge-dot" id="dailyDot"></span>
-        <span id="dailyBtnLabel">🎯 DAILY</span>
-      </button>
-      <button class="secondary" onclick="app.openShop('themes')">
-        🎨 THEMES
-      </button>
-      <button class="secondary" onclick="app.showScreen('howto')">
-        ❔ HOW TO PLAY
-      </button>
-    </div>
-
-    <!-- 2X SPARKS AD REWARD BUTTON -->
-    <div class="home-bottom-wrap">
+      <!-- 2X Sparks Ad Reward Banner (Placed right alongside Start!) -->
       <button class="boost-banner" id="boost2xBtn" onclick="app.handleBoost2xClick()" type="button" aria-label="2X Sparks Next Round">
         <div class="boost-banner-left">
           <span class="boost-icon" id="boost2xIcon">⚡</span>
@@ -146,7 +146,24 @@
         </div>
         <span class="boost-badge" id="boost2xBadge">📺 WATCH AD</span>
       </button>
-      <div class="home-version-tag" id="homeVersionTag">ODD ONE OUT · v1.3.2</div>
+    </div>
+
+    <!-- 5. 3 BOTTOM MODE BUTTONS (Daily, Themes, How to Play is fine) -->
+    <div class="mode-row mode-row-3">
+      <button class="secondary mode-btn" onclick="app.startDailyTarget()">
+        <span id="dailyBtnLabel">🎯 DAILY</span>
+      </button>
+      <button class="secondary mode-btn" onclick="app.openShop('themes')">
+        🎨 THEMES
+      </button>
+      <button class="secondary mode-btn" onclick="app.showScreen('howto')">
+        ❔ HOW TO PLAY
+      </button>
+    </div>
+
+    <!-- 6. VERSION STAMP -->
+    <div class="home-bottom-wrap">
+      <div class="home-version-tag" id="homeVersionTag">ODD ONE OUT · v1.3.6</div>
     </div>
   </section>
 
@@ -179,7 +196,7 @@
 
     <button class="primary" onclick="app.startQuickShot()">START PLAYING</button>
     <button class="secondary" onclick="app.showScreen('home')">BACK</button>
-    <div class="howto-version-tag">ODD ONE OUT · v1.3.2</div>
+    <div class="howto-version-tag">ODD ONE OUT · v1.3.6</div>
   </section>
 
   <!-- SHOP & PACKS SCREEN -->
@@ -224,45 +241,6 @@
       </div>
 
       <div class="choices" id="choices" role="group" aria-label="Word choices"></div>
-    </div>
-
-    <!-- MID-SCREEN COMMON RELATION REVEAL (Pops up when correct — NYT Connections style) -->
-    <div class="relation-reveal hidden" id="relationReveal" onclick="app.skipThemeReveal()" role="dialog" aria-modal="true" aria-label="Connection Reveal">
-      <div class="card relation-card" onclick="event.stopPropagation(); app.skipThemeReveal();">
-        <div class="relation-head-row">
-          <div class="relation-badge">
-            <span class="relation-icon">✨</span>
-            <span class="relation-badge-text">THE CONNECTION</span>
-            <span class="relation-check">✓</span>
-          </div>
-          <div class="relation-sparks-pill" id="relationSparksPill">⚡ +12</div>
-        </div>
-
-        <!-- 1-2 words for what was supposed to match! -->
-        <div class="relation-theme" id="relationTheme">PRIMARY COLORS</div>
-
-        <!-- Connected matching word chips -->
-        <div class="relation-words" id="relationWords"></div>
-
-        <!-- Punchy intruder callout: "Toaster ✕ Kitchen Appliance" -->
-        <div class="relation-intruder-tag" id="relationIntruderTag">
-          <span class="intruder-pill">ODD</span>
-          <strong class="intruder-name" id="relationIntruderName">Toaster</strong>
-          <span class="intruder-reason" id="relationIntruderReason">✕ Appliance</span>
-        </div>
-
-        <div class="relation-footer">
-          <div class="relation-countdown" id="relationCountdown">
-            <div class="countdown-bar-wrap">
-              <div class="relation-timer-fill" id="relationTimerFill"></div>
-            </div>
-            <div class="countdown-sub">
-              <span class="countdown-sec" id="relationCountdownSec">NEXT IN 2s</span>
-              <span class="countdown-tap">TAP ANYWHERE TO SKIP ▸</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
 
     <div class="progress"><i id="bar"></i></div>
@@ -405,7 +383,7 @@
       <button class="secondary" onclick="app.resetProgress()">RESET DATA</button>
       <button class="primary" id="settingsDoneBtn" style="padding:13px" onclick="app.closeSettings()">DONE</button>
     </div>
-    <div class="settings-version-tag">ODD ONE OUT · v1.3.2</div>
+    <div class="settings-version-tag">ODD ONE OUT · v1.3.6</div>
   </div>
 </div>
 
@@ -466,10 +444,10 @@
 
 <canvas id="fxCanvas" class="fx-canvas"></canvas>
 
-<script src="./js/packs-data.js?v=1.3.2"></script>
-<script src="./js/fx.js?v=1.3.2"></script>
-<script src="./js/audio.js?v=1.3.2"></script>
-<script src="./js/analytics.js?v=1.3.2"></script>
-<script src="./js/app.js?v=1.3.2"></script>
+<script src="./js/packs-data.js?v=1.3.6"></script>
+<script src="./js/fx.js?v=1.3.6"></script>
+<script src="./js/audio.js?v=1.3.6"></script>
+<script src="./js/analytics.js?v=1.3.6"></script>
+<script src="./js/app.js?v=1.3.6"></script>
 </body>
 </html>
