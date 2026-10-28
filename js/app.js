@@ -932,6 +932,7 @@
         clearTimeout(this.themeRevealTimer);
         this.themeRevealTimer = null;
       }
+      this.hideRelationReveal();
       this.answered = false;
       this.round += 1;
 
@@ -979,23 +980,22 @@
       const isWarmupPhase = diffCfg.phase === 'warmup';
       const isAdultSet = !!this.activeSet.adult;
 
-      // Category & Prompt
+      // Category & Prompt: Zero preview before guess (NYT Connections style: connection revealed ONLY upon solving!)
       const catEl = $('category');
       if (catEl) {
-        const prefix = isAdultSet ? '🔥 18+ · ' : '';
-        catEl.textContent = `${prefix}${this.activeSet.pack.replace('After Dark: ', '').toUpperCase()} · ${this.activeSet.category.toUpperCase()}`;
-        catEl.classList.toggle('trick-tag', isTrickTier && !isAdultSet);
-        catEl.classList.toggle('adult-tag', isAdultSet);
+        catEl.textContent = '';
+        catEl.classList.add('hidden');
+        catEl.style.display = 'none';
       }
 
       if ($('promptHeadline')) {
         $('promptHeadline').textContent =
           this.mode === 'daily'
-            ? `Daily Challenge #${this.round}: Which does not belong?`
-            : 'Which word does NOT belong?';
+            ? `Daily #${this.round}: Which doesn't belong?`
+            : "Which doesn't belong?";
       }
       if ($('promptSub')) {
-        $('promptSub').textContent = 'Three words share a theme. One does not.';
+        $('promptSub').textContent = 'Spot the odd word out';
       }
 
       // Card snap animation
@@ -1040,17 +1040,13 @@
 
       const choicesEl = $('choices');
       if (choicesEl) {
-        choicesEl.onclick = () => {
-          if (this.themeRevealTimer) {
-            this.skipThemeReveal();
-          }
-        };
+        choicesEl.onclick = null;
         choicesEl.classList.toggle('grid-2x2', use2x2);
         choicesEl.innerHTML = ordered
           .map((word, i) => {
             const safeAttr = word.replace(/"/g, '&quot;');
             const longCls = word.length > 22 ? ' long-word' : '';
-            return `<button class="choice${longCls}" data-word="${safeAttr}" onclick="app.chooseWord(this)">
+            return `<button class="choice${longCls}" data-word="${safeAttr}" onclick="event.stopPropagation(); app.chooseWord(this, event)">
               <span class="choice-left">
                 <span class="letter">${'ABCD'[i]}</span>
                 <span class="choice-word">${word}</span>
@@ -1130,7 +1126,7 @@
         const pct = Math.max(0, Math.min(100, (remaining / this.roundDuration) * 100));
         if (timerEl) {
           timerEl.style.setProperty('--p', `${pct.toFixed(1)}%`);
-          timerEl.classList.toggle('urgent', remaining <= 2.0);
+          timerEl.classList.toggle('urgent', remaining <= 3.0);
         }
 
         const ceilSec = Math.ceil(remaining);
@@ -1138,8 +1134,8 @@
           timeEl.textContent = formatClock(remaining);
         }
 
-        // Final-two-second audio tick (GDD Section 11)
-        if (ceilSec <= 2 && ceilSec > 0 && ceilSec < this.lastTickSecond) {
+        // Final-three-second audio tick (Gartic-phone / party game urgency)
+        if (ceilSec <= 3 && ceilSec > 0 && ceilSec < this.lastTickSecond) {
           this.lastTickSecond = ceilSec;
           if (window.oneShotAudio) window.oneShotAudio.playTick(ceilSec);
         }
@@ -1179,7 +1175,10 @@
       setTimeout(() => pill.classList.remove('bump'), 220);
     }
 
-    chooseWord(btn) {
+    chooseWord(btn, event) {
+      if (event && event.stopPropagation) {
+        event.stopPropagation();
+      }
       if (this.answered || !this.activeSet) return;
       this.answered = true;
       this.stopTimer();
@@ -1229,17 +1228,28 @@
       });
 
       if (isCorrect) {
+        if (window.oneShotFX && btn) {
+          const rect = btn.getBoundingClientRect();
+          window.oneShotFX.sparkBurst(rect.left + rect.width / 2, rect.top + rect.height / 2, '#62f5a7');
+        }
+        const catEl = document.getElementById('category');
         const headlineEl = document.getElementById('promptHeadline');
         const subEl = document.getElementById('promptSub');
+        const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
+        if (catEl) {
+          const prefix = !!this.activeSet.adult ? '🔥 18+ · ' : '';
+          catEl.textContent = `${prefix}${connectionTitle}`;
+        }
         if (headlineEl) {
-          headlineEl.innerHTML = `✨ THEME: <span class="revealed-theme">${this.activeSet.category}</span>`;
+          headlineEl.innerHTML = `✨ THE CONNECTION: <span class="revealed-theme">${connectionTitle}</span>`;
         }
         if (subEl) {
-          subEl.innerHTML = `All 3 remaining words match <strong>${this.activeSet.category}</strong>!`;
+          subEl.innerHTML = `All 3 match <strong>${connectionTitle}</strong>!`;
         }
         this.handleCorrectHit(remSec);
       } else {
         if (window.oneShotAudio) window.oneShotAudio.playMiss(false);
+        if (window.oneShotFX) window.oneShotFX.screenShake(6);
         if (window.oneShotAnalytics) {
           window.oneShotAnalytics.track('answer_wrong', {
             setId: this.activeSet.id,
@@ -1291,10 +1301,86 @@
       setTimeout(() => this.finishRun(false, true), 560);
     }
 
+    showRelationReveal() {
+      const modal = document.getElementById('relationReveal');
+      if (!modal || !this.activeSet) return;
+
+      this.canSkipRevealAfter = Date.now() + 450; // Protect against accidental double-taps immediately dismissing modal
+
+      const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
+      const themeEl = document.getElementById('relationTheme');
+      if (themeEl) {
+        themeEl.textContent = connectionTitle;
+      }
+
+      const wordsEl = document.getElementById('relationWords');
+      if (wordsEl) {
+        const words = (this.activeValidSample && this.activeValidSample.length)
+          ? this.activeValidSample
+          : (this.activeSet.validWords || []).slice(0, 3);
+        wordsEl.innerHTML = words
+          .map((w) => `<span class="relation-word-chip">${w}</span>`)
+          .join('<span class="relation-dot">●</span>');
+      }
+
+      const intruderNameEl = document.getElementById('relationIntruderName');
+      const intruderReasonEl = document.getElementById('relationIntruderReason');
+      if (intruderNameEl) intruderNameEl.textContent = this.activeSet.intruder;
+      if (intruderReasonEl) {
+        const shortTag = this.activeSet.shortTag || 'Doesn\'t Fit';
+        intruderReasonEl.textContent = `✕ ${shortTag}`;
+      }
+
+      const secEl = document.getElementById('relationCountdownSec');
+      if (secEl) secEl.textContent = 'NEXT IN 2.5s';
+
+      if (this.countdownInterval) clearInterval(this.countdownInterval);
+      const startRevealTime = Date.now();
+      const totalSec = 2.5;
+      this.countdownInterval = setInterval(() => {
+        const elapsed = (Date.now() - startRevealTime) / 1000;
+        const rem = Math.max(0, totalSec - elapsed);
+        if (secEl) secEl.textContent = `NEXT IN ${rem.toFixed(1)}s`;
+        if (rem <= 0) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
+      }, 100);
+
+      const fillEl = document.getElementById('relationTimerFill');
+      if (fillEl) {
+        fillEl.classList.remove('animating');
+        void fillEl.offsetWidth;
+        fillEl.classList.add('animating');
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    hideRelationReveal() {
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+      }
+      const modal = document.getElementById('relationReveal');
+      if (modal) {
+        modal.classList.add('hidden');
+      }
+      const fillEl = document.getElementById('relationTimerFill');
+      if (fillEl) {
+        fillEl.classList.remove('animating');
+      }
+    }
+
     skipThemeReveal() {
+      // Debounce fast taps for 450ms so an answer click never prematurely dismisses the modal
+      if (this.canSkipRevealAfter && Date.now() < this.canSkipRevealAfter) {
+        return;
+      }
       if (this.themeRevealTimer) {
         clearTimeout(this.themeRevealTimer);
         this.themeRevealTimer = null;
+        this.hideRelationReveal();
         if (this.mode === 'daily' && this.round >= 5) {
           this.finishDailySuccess();
         } else {
@@ -1452,9 +1538,11 @@
       const boostSuffix = this.boost2xActive ? ' (2X!)' : '';
       if (isNewBest) {
         if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
+        if (window.oneShotFX) window.oneShotFX.confettiShower(75);
         this.showFloatingBurst(`🏆 NEW BEST! +${gained} ⚡${boostSuffix}`);
       } else if (reward.isMilestone) {
         if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
+        if (window.oneShotFX) window.oneShotFX.confettiShower(50);
         this.showFloatingBurst(`${reward.bonusTag}+${gained} ⚡${boostSuffix}`);
       } else {
         if (window.oneShotAudio) window.oneShotAudio.playCorrect(this.streak);
@@ -1471,13 +1559,21 @@
         barEl.style.width = `${pct}%`;
       }
 
-      if (this.mode === 'daily' && this.round >= 5) {
-        this.themeRevealTimer = setTimeout(() => this.finishDailySuccess(), 950);
-        return;
-      }
+      // Display mid-screen common relation reveal with a 2.5s pause
+      this.showRelationReveal();
 
-      const revealDelay = !Number.isFinite(this.roundDuration) ? 1200 : 980;
-      this.themeRevealTimer = setTimeout(() => this.nextRound(), revealDelay);
+      const pauseDuration = 2500; // 2.5s pause, can be skipped anytime by tapping anywhere after brief debounce
+      if (this.themeRevealTimer) {
+        clearTimeout(this.themeRevealTimer);
+      }
+      this.themeRevealTimer = setTimeout(() => {
+        this.hideRelationReveal();
+        if (this.mode === 'daily' && this.round >= 5) {
+          this.finishDailySuccess();
+        } else {
+          this.nextRound();
+        }
+      }, pauseDuration);
     }
 
     finishDailySuccess() {
@@ -1499,6 +1595,7 @@
       this.saveState();
 
       if (window.oneShotAudio) window.oneShotAudio.playMilestone(10);
+      if (window.oneShotFX) window.oneShotFX.confettiShower(85);
       if (window.oneShotAnalytics) {
         window.oneShotAnalytics.track('daily_completed', {
           date: today,
@@ -1512,6 +1609,7 @@
 
     finishRun(completedDaily, isTimeout) {
       this.stopTimer();
+      this.hideRelationReveal();
       this.answered = true;
       this.state.completedRuns = (this.state.completedRuns || 0) + 1;
       this.saveState();
@@ -1562,21 +1660,23 @@
       }
 
       if (this.activeSet) {
+        const shortCat = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
+        const shortTag = this.activeSet.shortTag || "Doesn't Fit";
         if ($('explainCategory')) {
-          $('explainCategory').textContent = `${this.activeSet.pack} · ${this.activeSet.category}`;
+          $('explainCategory').textContent = shortCat;
         }
         if ($('explainIntruder')) {
-          $('explainIntruder').textContent = `ANSWER: ${this.activeSet.intruder.toUpperCase()}`;
+          $('explainIntruder').textContent = this.activeSet.intruder;
         }
-        if ($('explainText')) {
-          $('explainText').textContent = this.activeSet.explanation;
+        if ($('explainReason')) {
+          $('explainReason').textContent = `✕ ${shortTag}`;
         }
         if ($('explainValid')) {
           const validShown =
             this.activeValidSample && this.activeValidSample.length > 0
               ? this.activeValidSample
               : this.activeSet.validWords.slice(0, 3);
-          $('explainValid').textContent = `Matching words: ${validShown.join(' · ')}`;
+          $('explainValid').textContent = validShown.join(' · ');
         }
       }
 

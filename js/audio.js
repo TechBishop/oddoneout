@@ -1,12 +1,6 @@
 /**
- * ONE SHOT — Procedural Web Audio Synthesizer & Mobile Haptics
- * Implements GDD Section 11:
- * - Short launch sting
- * - Final-two-second tick
- * - Confirmation click with pitch escalation
- * - Miss buzzer
- * - Music escalation every five streaks
- * - Sound and haptic toggles
+ * Odd One Out — Procedural Web Audio Synthesizer & Mobile Haptics
+ * 2026 Casual Party Audio Engine (Juicy, Tactile, Nintendo/Jackbox Inspired)
  */
 (function () {
   class SoundHapticsEngine {
@@ -68,9 +62,17 @@
       osc.stop(now + duration + 0.015);
     }
 
+    // Playful bubble-pop on button taps
     playTap() {
       this.vibrate(8);
-      this.playTone({ freq: 520, endFreq: 660, type: 'triangle', duration: 0.045, gain: 0.07 });
+      this.playTone({ freq: 580, endFreq: 780, type: 'triangle', duration: 0.045, gain: 0.08 });
+      this.playTone({ freq: 880, endFreq: 1100, type: 'sine', duration: 0.035, gain: 0.05, delay: 0.01 });
+    }
+
+    // Whoosh when transitioning cards or screens
+    playWhoosh() {
+      if (!this.soundEnabled) return;
+      this.playTone({ freq: 320, endFreq: 160, type: 'triangle', duration: 0.08, gain: 0.04 });
     }
 
     // Short launch sting when starting a run
@@ -81,54 +83,64 @@
       this.playTone({ freq: 659.25, endFreq: 880, type: 'sine', duration: 0.18, gain: 0.15, delay: 0.12 });
     }
 
-    // Final-two-second countdown tick
+    // Final countdown tick: rhythmic heartbeats
     playTick(secondsLeft) {
       this.vibrate(10);
-      const isFinalSecond = secondsLeft <= 1;
+      const isUrgent = secondsLeft <= 2;
       this.playTone({
-        freq: isFinalSecond ? 980 : 760,
-        endFreq: isFinalSecond ? 880 : 700,
+        freq: isUrgent ? 1040 : 820,
+        endFreq: isUrgent ? 920 : 740,
         type: 'sine',
-        duration: 0.06,
-        gain: isFinalSecond ? 0.14 : 0.09
+        duration: 0.055,
+        gain: isUrgent ? 0.15 : 0.09
       });
+      if (isUrgent) {
+        this.playTone({ freq: 520, endFreq: 460, type: 'triangle', duration: 0.04, gain: 0.06, delay: 0.02 });
+      }
     }
 
-    // Confirmation click + streak escalation
+    // Rich dual-tone confirmation chime with streak pitch escalation
     playCorrect(streak = 1) {
       this.vibrate(18);
-      // Escalate base pitch smoothly across extended streaks (capped so it stays musical)
-      const semitoneShift = Math.min(streak, 28);
-      const baseFreq = 523.25 * Math.pow(2, semitoneShift / 42);
-      this.playTone({ freq: baseFreq, endFreq: baseFreq * 1.25, type: 'triangle', duration: 0.09, gain: 0.13, delay: 0 });
-      this.playTone({ freq: baseFreq * 1.25, endFreq: baseFreq * 1.5, type: 'sine', duration: 0.15, gain: 0.15, delay: 0.055 });
+      const semitoneShift = Math.min(streak, 24);
+      const baseFreq = 523.25 * Math.pow(2, semitoneShift / 40);
+      // Root note (bright triangle)
+      this.playTone({ freq: baseFreq, endFreq: baseFreq * 1.15, type: 'triangle', duration: 0.08, gain: 0.13, delay: 0 });
+      // Major third (harmonious bell sine)
+      this.playTone({ freq: baseFreq * 1.2599, endFreq: baseFreq * 1.35, type: 'sine', duration: 0.12, gain: 0.11, delay: 0.04 });
+      // Perfect fifth sparkle
+      this.playTone({ freq: baseFreq * 1.4983, endFreq: baseFreq * 1.6, type: 'sine', duration: 0.16, gain: 0.13, delay: 0.07 });
     }
 
-    // Music escalation every five streaks
+    // Upbeat celebratory fanfare on 5x streak milestones & Personal Bests
     playMilestone(streak = 5) {
-      this.vibrate([22, 40, 25, 40, 45]);
+      this.vibrate([24, 40, 25, 45, 55]);
+      // Triad flourish: C5, E5, G5, C6 with trailing shimmer
       const notes = [523.25, 659.25, 783.99, 1046.5];
       notes.forEach((n, idx) => {
         this.playTone({
           freq: n,
-          endFreq: n * 1.03,
+          endFreq: n * 1.04,
           type: 'triangle',
-          duration: idx === notes.length - 1 ? 0.26 : 0.11,
+          duration: idx === notes.length - 1 ? 0.28 : 0.1,
           gain: 0.15,
           delay: idx * 0.065
         });
       });
+      // Harmony shimmer on the final hit
+      this.playTone({ freq: 1318.5, endFreq: 1318.5, type: 'sine', duration: 0.32, gain: 0.12, delay: 0.22 });
     }
 
-    // Miss buzzer or timeout down-sweep
+    // Playful comic wobble/thud on miss or timeout
     playMiss(isTimeout = false) {
       this.vibrate([45, 50, 75]);
       if (isTimeout) {
-        this.playTone({ freq: 380, endFreq: 130, type: 'sawtooth', duration: 0.28, gain: 0.13, delay: 0 });
-        this.playTone({ freq: 240, endFreq: 95, type: 'sawtooth', duration: 0.32, gain: 0.12, delay: 0.1 });
+        this.playTone({ freq: 420, endFreq: 120, type: 'sawtooth', duration: 0.26, gain: 0.12, delay: 0 });
+        this.playTone({ freq: 260, endFreq: 85, type: 'triangle', duration: 0.32, gain: 0.14, delay: 0.08 });
       } else {
-        this.playTone({ freq: 195, endFreq: 140, type: 'sawtooth', duration: 0.16, gain: 0.13, delay: 0 });
-        this.playTone({ freq: 155, endFreq: 105, type: 'sawtooth', duration: 0.26, gain: 0.14, delay: 0.11 });
+        // Comic double-thud
+        this.playTone({ freq: 240, endFreq: 150, type: 'triangle', duration: 0.12, gain: 0.14, delay: 0 });
+        this.playTone({ freq: 170, endFreq: 100, type: 'sawtooth', duration: 0.24, gain: 0.15, delay: 0.09 });
       }
     }
 
