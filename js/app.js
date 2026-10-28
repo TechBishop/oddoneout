@@ -4,7 +4,7 @@
  */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const APP_VERSION = '1.3.2';
+  const APP_VERSION = '1.3.6';
   const SAVE_KEY = 'oneshot_save_v1';
   console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
 
@@ -512,11 +512,11 @@
           $('activePackName').textContent = 'None Selected (Tap to Choose)';
         } else if (counts.enabledCount === 1) {
           const single = (this.state.enabledPacks && this.state.enabledPacks[0]) || 'General Knowledge';
-          $('activePackName').textContent = `${single} (${counts.activeSets.toLocaleString()} Prompts)`;
+          $('activePackName').textContent = `${single} (${counts.activeSets.toLocaleString()})`;
         } else if (counts.enabledCount === counts.totalUnlockedPacks) {
-          $('activePackName').textContent = `All Topics (${counts.activeSets.toLocaleString()} Prompts)`;
+          $('activePackName').textContent = `All Topics (${counts.activeSets.toLocaleString()})`;
         } else {
-          $('activePackName').textContent = `${counts.enabledCount} Topics (${counts.activeSets.toLocaleString()} Prompts)`;
+          $('activePackName').textContent = `${counts.enabledCount} Topics (${counts.activeSets.toLocaleString()})`;
         }
       }
 
@@ -1320,187 +1320,184 @@
       setTimeout(() => this.finishRun(false, true), 560);
     }
 
-    showRelationReveal(rewardInfo) {
-      const modal = document.getElementById('relationReveal');
-      if (!modal || !this.activeSet) return;
+    triggerWinFeedback(gained, isUnlimited, isNewBest, reward, remSec) {
+      const feedbackEl = document.getElementById('winFeedback');
+      const sparkPill = document.getElementById('winSparkPill');
+      const sparkIcon = document.getElementById('winSparkIcon');
+      const sparkVal = document.getElementById('winSparkValue');
+      const sparkBadge = document.getElementById('winSparkBadge');
+      const themeNameEl = document.getElementById('winThemeName');
+      const wordsEl = document.getElementById('winWords');
+      const intruderNameEl = document.getElementById('winIntruderName');
+      const intruderReasonEl = document.getElementById('winIntruderReason');
 
-      this.canSkipRevealAfter = Date.now() + 750; // Protect against accidental double-taps immediately dismissing modal
-
-      const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
-      const themeEl = document.getElementById('relationTheme');
-      if (themeEl) {
-        themeEl.textContent = connectionTitle;
-      }
-
-      const sparksPill = document.getElementById('relationSparksPill');
-      if (sparksPill && rewardInfo) {
-        if (rewardInfo.isPractice) {
-          sparksPill.textContent = `🎯 STREAK ${this.streak}`;
-          sparksPill.classList.add('is-practice');
-        } else {
-          sparksPill.textContent = rewardInfo.label;
-          sparksPill.classList.remove('is-practice');
+      if (!feedbackEl || !this.activeSet) {
+        if (!isUnlimited && gained > 0) {
+          this.runSparks += gained;
+          this.state.sparks += gained;
+          this.saveState();
+          this.bumpCoinsPill();
         }
+        if (this.mode === 'daily' && this.round >= 5) {
+          this.finishDailySuccess();
+        } else {
+          this.nextRound();
+        }
+        return;
       }
 
-      const wordsEl = document.getElementById('relationWords');
+      // 1. Populate Theme & Words confirmation in middle of screen
+      const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
+      if (themeNameEl) themeNameEl.textContent = connectionTitle;
+
       if (wordsEl) {
-        const words = (this.activeValidSample && this.activeValidSample.length)
+        const validWords = (this.activeValidSample && this.activeValidSample.length)
           ? this.activeValidSample
           : (this.activeSet.validWords || []).slice(0, 3);
-        wordsEl.innerHTML = words
-          .map((w) => `<span class="relation-word-chip">${w}</span>`)
-          .join('<span class="relation-dot">●</span>');
+        wordsEl.textContent = validWords.join(' · ');
       }
 
-      const intruderNameEl = document.getElementById('relationIntruderName');
-      const intruderReasonEl = document.getElementById('relationIntruderReason');
       if (intruderNameEl) intruderNameEl.textContent = this.activeSet.intruder;
       if (intruderReasonEl) {
         const shortTag = this.activeSet.shortTag || 'Doesn\'t Fit';
         intruderReasonEl.textContent = `✕ ${shortTag}`;
       }
 
-      const secEl = document.getElementById('relationCountdownSec');
-      if (secEl) secEl.textContent = 'NEXT IN 2.5s';
+      // 2. Populate Sparks value & badge
+      if (sparkIcon) sparkIcon.textContent = isUnlimited ? '🎯' : '⚡';
+      if (sparkVal) {
+        sparkVal.textContent = isUnlimited ? `STREAK ${this.streak}` : `+${gained} ⚡`;
+      }
 
-      if (this.countdownInterval) clearInterval(this.countdownInterval);
-      const startRevealTime = Date.now();
-      const totalSec = 2.5;
-      this.countdownInterval = setInterval(() => {
-        const elapsed = (Date.now() - startRevealTime) / 1000;
-        const rem = Math.max(0, totalSec - elapsed);
-        if (secEl) {
-          secEl.textContent = `NEXT IN ${rem.toFixed(1)}s`;
+      if (sparkBadge) {
+        if (isUnlimited) {
+          sparkBadge.textContent = reward.isMilestone ? 'PRACTICE MILESTONE!' : 'PRACTICE';
+          sparkBadge.classList.add('visible');
+        } else if (isNewBest) {
+          sparkBadge.textContent = this.boost2xActive ? 'NEW BEST! (2X)' : 'NEW BEST!';
+          sparkBadge.classList.add('visible');
+        } else if (this.boost2xActive) {
+          sparkBadge.textContent = '2X BOOST!';
+          sparkBadge.classList.add('visible');
+        } else if (reward.isMilestone) {
+          sparkBadge.textContent = `STREAK ${this.streak}!`;
+          sparkBadge.classList.add('visible');
+        } else if (Number.isFinite(remSec) && remSec <= 1.1) {
+          sparkBadge.textContent = `CLUTCH ${remSec.toFixed(1)}s!`;
+          sparkBadge.classList.add('visible');
+        } else {
+          sparkBadge.textContent = '';
+          sparkBadge.classList.remove('visible');
         }
-        if (rem <= 0) {
-          clearInterval(this.countdownInterval);
-          this.countdownInterval = null;
+      }
+
+      if (sparkPill) {
+        sparkPill.classList.remove('zapping', 'is-practice', 'is-boosted');
+        sparkPill.style.transform = '';
+        if (isUnlimited) {
+          sparkPill.classList.add('is-practice');
+        } else if (this.boost2xActive) {
+          sparkPill.classList.add('is-boosted');
         }
-      }, 100);
-
-      const fillEl = document.getElementById('relationTimerFill');
-      if (fillEl) {
-        fillEl.classList.remove('animating');
-        void fillEl.offsetWidth;
-        fillEl.classList.add('animating');
       }
 
-      modal.classList.remove('hidden');
-    }
+      // 3. Show feedback card in dead center of screen
+      feedbackEl.classList.remove('hidden');
 
-    hideRelationReveal() {
-      if (this.countdownInterval) {
-        clearInterval(this.countdownInterval);
-        this.countdownInterval = null;
-      }
-      const modal = document.getElementById('relationReveal');
-      if (modal) {
-        modal.classList.add('hidden');
-      }
-      const fillEl = document.getElementById('relationTimerFill');
-      if (fillEl) {
-        fillEl.classList.remove('animating');
-      }
-      const zapPill = document.getElementById('centerZapPill');
-      if (zapPill) {
-        zapPill.classList.add('hidden');
-        zapPill.classList.remove('popping', 'zapping', 'dissolving');
-      }
-    }
-
-    triggerCenterZap(gained, zapLabelText, zapSubText, isPractice) {
-      const pill = document.getElementById('centerZapPill');
-      if (!pill) return;
-
-      const iconEl = document.getElementById('zapIcon');
-      const labelEl = document.getElementById('zapLabel');
-      const subEl = document.getElementById('zapSub');
-
-      if (iconEl) iconEl.textContent = isPractice ? '🎯' : '⚡';
-      if (labelEl) labelEl.textContent = zapLabelText;
-      if (subEl) subEl.textContent = zapSubText || '';
-
-      // Reset CSS classes
-      pill.classList.remove('hidden', 'popping', 'zapping', 'dissolving', 'is-practice', 'is-boosted');
-      if (isPractice) {
-        pill.classList.add('is-practice');
-      } else if (this.boost2xActive) {
-        pill.classList.add('is-boosted');
-      }
-
-      // Calculate vector from viewport center to the game header sparks pill (#gameCoinsPill or #coinsPill)
-      const gameCoinsPill = document.getElementById('gameCoinsPill');
-      const coinsPill = document.getElementById('coinsPill');
-      const targetPill = (gameCoinsPill && gameCoinsPill.offsetParent !== null) ? gameCoinsPill : coinsPill;
-      const targetRect = targetPill ? targetPill.getBoundingClientRect() : { left: window.innerWidth / 2 - 25, top: 16, width: 50, height: 28 };
       const centerX = window.innerWidth / 2;
-      const centerY = window.innerHeight * 0.35;
+      const centerY = window.innerHeight / 2;
+      if (window.oneShotFX) {
+        window.oneShotFX.sparkBurst(centerX, centerY, isUnlimited ? '#33e6ff' : '#ffdc48');
+      }
+
+      // Calculate deposit destination vector (towards #gameCoinsPill in header)
+      const gameCoinsPill = document.getElementById('gameCoinsPill') || document.getElementById('coinsPill');
+      const targetRect = gameCoinsPill ? gameCoinsPill.getBoundingClientRect() : { left: window.innerWidth / 2 - 25, top: 16, width: 50, height: 28 };
       const targetX = targetRect.left + targetRect.width / 2;
       const targetY = targetRect.top + targetRect.height / 2;
 
-      pill.style.setProperty('--zap-dx', `${targetX - centerX}px`);
-      pill.style.setProperty('--zap-dy', `${targetY - centerY}px`);
+      const pillRect = sparkPill ? sparkPill.getBoundingClientRect() : { left: centerX - 40, top: centerY - 20, width: 80, height: 40 };
+      const pillCenterX = pillRect.left + pillRect.width / 2;
+      const pillCenterY = pillRect.top + pillRect.height / 2;
 
-      // Pop into screen center with juicy spring bounce
-      pill.classList.add('popping');
-      if (window.oneShotFX) {
-        window.oneShotFX.sparkBurst(centerX, centerY, isPractice ? '#33e6ff' : '#ffdc48');
+      const dx = targetX - pillCenterX;
+      const dy = targetY - pillCenterY;
+      if (sparkPill) {
+        sparkPill.style.setProperty('--spark-dx', `${dx}px`);
+        sparkPill.style.setProperty('--spark-dy', `${dy}px`);
       }
 
-      if (this.zapTimeout) clearTimeout(this.zapTimeout);
-      if (this.zapFlightTimeout) clearTimeout(this.zapFlightTimeout);
+      let advanced = false;
+      const completeAndAdvance = () => {
+        if (advanced) return;
+        advanced = true;
+        if (this.winTimer1) clearTimeout(this.winTimer1);
+        if (this.winTimer2) clearTimeout(this.winTimer2);
+        feedbackEl.classList.add('hidden');
+        if (sparkPill) sparkPill.classList.remove('zapping');
 
-      if (isPractice || gained === 0) {
-        // Untimed practice mode: smooth dissolve without currency flight
-        this.zapTimeout = setTimeout(() => {
-          pill.classList.remove('popping');
-          pill.classList.add('dissolving');
-          this.zapFlightTimeout = setTimeout(() => {
-            pill.classList.add('hidden');
-            pill.classList.remove('dissolving');
-          }, 320);
-        }, 420);
-      } else {
-        // Timed mode: Launch electric laser flight to sparks balance!
-        this.zapTimeout = setTimeout(() => {
-          pill.classList.remove('popping');
-          pill.classList.add('zapping');
-
-          if (window.oneShotAudio && typeof window.oneShotAudio.playZap === 'function') {
-            window.oneShotAudio.playZap();
+        // Deposit sparks into balance
+        if (!isUnlimited && gained > 0) {
+          this.runSparks += gained;
+          this.state.sparks += gained;
+          this.saveState();
+          this.bumpCoinsPill();
+          if (window.oneShotFX) {
+            window.oneShotFX.sparkBurst(targetX, targetY, '#ffdc48');
           }
-          if (window.oneShotFX && typeof window.oneShotFX.zapTrail === 'function') {
-            window.oneShotFX.zapTrail(centerX, centerY, targetX, targetY, '#ffdc48');
-          }
+        }
 
-          // On arrival at top sparks pill
-          this.zapFlightTimeout = setTimeout(() => {
-            pill.classList.add('hidden');
-            pill.classList.remove('zapping');
-            this.bumpCoinsPill();
-            if (window.oneShotFX) {
-              window.oneShotFX.sparkBurst(targetX, targetY, '#ffdc48');
-            }
-          }, 360);
-        }, 420);
-      }
-    }
-
-    skipThemeReveal() {
-      // Debounce fast taps for 750ms so an answer click never prematurely dismisses the modal
-      if (this.canSkipRevealAfter && Date.now() < this.canSkipRevealAfter) {
-        return;
-      }
-      if (this.themeRevealTimer) {
-        clearTimeout(this.themeRevealTimer);
-        this.themeRevealTimer = null;
-        this.hideRelationReveal();
         if (this.mode === 'daily' && this.round >= 5) {
           this.finishDailySuccess();
         } else {
           this.nextRound();
         }
+      };
+
+      // Tapping anywhere immediately deposits and advances
+      feedbackEl.onclick = completeAndAdvance;
+
+      // Phase 1: Card win feedback in center of screen (480ms)
+      this.winTimer1 = setTimeout(() => {
+        if (advanced) return;
+        // Phase 2: Deposit of Spark! Launch electric flight to header counter
+        if (sparkPill && !isUnlimited && gained > 0) {
+          sparkPill.classList.add('zapping');
+          if (window.oneShotAudio && typeof window.oneShotAudio.playZap === 'function') {
+            window.oneShotAudio.playZap();
+          }
+          if (window.oneShotFX && typeof window.oneShotFX.zapTrail === 'function') {
+            window.oneShotFX.zapTrail(pillCenterX, pillCenterY, targetX, targetY, '#ffdc48');
+          }
+        }
+
+        // Phase 3: Spark lands in header counter, deposits, and next round begins (360ms later)
+        this.winTimer2 = setTimeout(() => {
+          completeAndAdvance();
+        }, 360);
+      }, 480);
+    }
+
+    hideWinFeedback() {
+      if (this.winTimer1) clearTimeout(this.winTimer1);
+      if (this.winTimer2) clearTimeout(this.winTimer2);
+      const feedbackEl = document.getElementById('winFeedback');
+      if (feedbackEl) feedbackEl.classList.add('hidden');
+      const sparkPill = document.getElementById('winSparkPill');
+      if (sparkPill) sparkPill.classList.remove('zapping');
+    }
+
+    // Aliases for backward compatibility
+    hideRelationReveal() {
+      this.hideWinFeedback();
+    }
+
+    skipThemeReveal() {
+      this.hideWinFeedback();
+      if (this.mode === 'daily' && this.round >= 5) {
+        this.finishDailySuccess();
+      } else {
+        this.nextRound();
       }
     }
 
@@ -1635,13 +1632,6 @@
         gained *= 2;
       }
 
-      if (!isUnlimited && gained > 0) {
-        this.runSparks += gained;
-        this.state.sparks += gained;
-        this.saveState();
-        this.bumpCoinsPill();
-      }
-
       if (window.oneShotAnalytics) {
         window.oneShotAnalytics.track('answer_correct', {
           setId: this.activeSet.id,
@@ -1650,29 +1640,6 @@
           boostActive: this.boost2xActive,
           timeLeft: Number.isFinite(remSec) ? Number(remSec.toFixed(2)) : null
         });
-      }
-
-      // Prepare dynamic label and subtitle for Center Zap Pill & Relation Card
-      let zapLabel = `+${gained} ⚡`;
-      let zapSub = '';
-      if (isUnlimited) {
-        zapLabel = `STREAK ${this.streak}`;
-        zapSub = reward.isMilestone ? 'PRACTICE MILESTONE!' : 'PRACTICE';
-      } else if (isNewBest) {
-        zapLabel = `+${gained} ⚡`;
-        zapSub = this.boost2xActive ? 'NEW BEST! (2X)' : 'NEW BEST!';
-      } else if (this.boost2xActive) {
-        zapLabel = `+${gained} ⚡`;
-        zapSub = '2X BOOST!';
-      } else if (reward.isMilestone) {
-        zapLabel = `+${gained} ⚡`;
-        zapSub = `STREAK ${this.streak}!`;
-      } else if (Number.isFinite(remSec) && remSec <= 1.1) {
-        zapLabel = `+${gained} ⚡`;
-        zapSub = `CLUTCH ${remSec.toFixed(1)}s!`;
-      } else if (reward.bonusTag) {
-        zapLabel = `+${gained} ⚡`;
-        zapSub = reward.bonusTag.trim();
       }
 
       if (isUnlimited) {
@@ -1694,9 +1661,6 @@
         }
       }
 
-      // 1. Trigger the center feedback zap pill!
-      this.triggerCenterZap(gained, zapLabel, zapSub, isUnlimited);
-
       const streakEl = document.getElementById('streak');
       if (streakEl) streakEl.textContent = String(this.streak);
       const barEl = document.getElementById('bar');
@@ -1705,21 +1669,8 @@
         barEl.style.width = `${pct}%`;
       }
 
-      // 2. Display mid-screen common relation reveal with a 2.5s pause
-      this.showRelationReveal({ label: zapLabel, sub: zapSub, isPractice: isUnlimited });
-
-      const pauseDuration = 2500; // 2.5s pause, can be skipped anytime by tapping anywhere after brief debounce
-      if (this.themeRevealTimer) {
-        clearTimeout(this.themeRevealTimer);
-      }
-      this.themeRevealTimer = setTimeout(() => {
-        this.hideRelationReveal();
-        if (this.mode === 'daily' && this.round >= 5) {
-          this.finishDailySuccess();
-        } else {
-          this.nextRound();
-        }
-      }, pauseDuration);
+      // Trigger user feedback per win of card & deposit of spark in middle of screen!
+      this.triggerWinFeedback(gained, isUnlimited, isNewBest, reward, remSec);
     }
 
     finishDailySuccess() {
