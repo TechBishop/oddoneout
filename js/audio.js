@@ -151,6 +151,14 @@
       this.playTone({ freq: 880, type: 'sine', duration: 0.11, gain: 0.14, delay: 0.07 });
       this.playTone({ freq: 1174.66, type: 'triangle', duration: 0.22, gain: 0.16, delay: 0.14 });
     }
+
+    // High-voltage electric zap / laser streak when center sparks fly to balance
+    playZap() {
+      if (!this.soundEnabled) return;
+      this.vibrate([12, 16, 20]);
+      this.playTone({ freq: 940, endFreq: 1880, type: 'sawtooth', duration: 0.075, gain: 0.1 });
+      this.playTone({ freq: 1880, endFreq: 2800, type: 'sine', duration: 0.11, gain: 0.12, delay: 0.02 });
+    }
   }
 
   window.oneShotAudio = new SoundHapticsEngine();
