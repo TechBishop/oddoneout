@@ -1803,36 +1803,42 @@
     }
 
     showWebRewardedAd(type) {
+      console.log('[Ad] showWebRewardedAd started, type:', type);
       try {
         if (typeof window.adBreak === 'function') {
           let adHandled = false;
-          // 3.5s safety watchdog: if AdSense is blocked by AdBlock or fails to load, fallback to simulated modal
+          // Snappy 900ms safety watchdog: if AdSense is blocked by AdBlock or fails to load, fallback to simulated modal immediately
           const safetyTimer = setTimeout(() => {
+            console.log('[Ad] safetyTimer fired, adHandled:', adHandled);
             if (!adHandled) {
               adHandled = true;
               this.openRewardedAdModal(type);
             }
-          }, 3500);
+          }, 900);
 
           window.adBreak({
             type: 'reward',
             name: type,
             beforeReward: (showAdFn) => {
+              console.log('[Ad] beforeReward called');
               adHandled = true;
               clearTimeout(safetyTimer);
               showAdFn();
             },
             adDismissed: () => {
+              console.log('[Ad] adDismissed called');
               adHandled = true;
               clearTimeout(safetyTimer);
               this.cancelRewardedAd();
             },
             adViewed: () => {
+              console.log('[Ad] adViewed called');
               adHandled = true;
               clearTimeout(safetyTimer);
               this.grantAdReward(type);
             },
             adBreakDone: (info) => {
+              console.log('[Ad] adBreakDone called, info:', JSON.stringify(info));
               clearTimeout(safetyTimer);
               if (!adHandled) {
                 adHandled = true;
@@ -1844,12 +1850,16 @@
           });
           return;
         }
-      } catch (_) {}
+      } catch (e) {
+        console.error('[Ad] showWebRewardedAd error:', e);
+      }
       this.openRewardedAdModal(type);
     }
 
     openRewardedAdModal(type) {
+      console.log('[Ad] openRewardedAdModal called, type:', type);
       const overlay = document.getElementById('rewardedAdModal');
+      console.log('[Ad] overlay element exists:', !!overlay);
       if (!overlay) {
         this.grantAdReward(type);
         return;

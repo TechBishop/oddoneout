@@ -17,7 +17,7 @@
   <!-- GOOGLE ADSENSE (H5 GAMES ADS API) -->
   <script async
     data-ad-client="ca-pub-2691430114035059"
-    data-ad-frequency-hint="30s"
+    data-ad-frequency-hint="0s"
     data-adbreak-test="on"
     crossorigin="anonymous"
     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js">
@@ -26,6 +26,10 @@
     window.adsbygoogle = window.adsbygoogle || [];
     window.adBreak = function(o) { adsbygoogle.push(o); };
     window.adConfig = function(o) { adsbygoogle.push(o); };
+    window.adConfig({
+      preloadAdBreaks: 'on',
+      sound: 'on'
+    });
   </script>
 </head>
 <body>
