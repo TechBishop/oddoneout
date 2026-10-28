@@ -3,7 +3,10 @@
  * Implements ONE SHOT Game Design Document v1.0 + Mega Party Pack Expansion & Adult Mode
  */
 (function () {
+  const $ = (id) => document.getElementById(id);
+  const APP_VERSION = '1.3.2';
   const SAVE_KEY = 'oneshot_save_v1';
+  console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
 
   const STANDARD_PACKS = [
     'General Knowledge',
@@ -1174,11 +1177,21 @@
 
     bumpCoinsPill() {
       const pill = document.getElementById('coinsPill');
-      if (!pill) return;
-      pill.classList.remove('bump');
-      void pill.offsetWidth;
-      pill.classList.add('bump');
-      setTimeout(() => pill.classList.remove('bump'), 220);
+      const gamePill = document.getElementById('gameCoinsPill');
+      if (pill) {
+        pill.classList.remove('bump');
+        void pill.offsetWidth;
+        pill.classList.add('bump');
+        setTimeout(() => pill.classList.remove('bump'), 240);
+      }
+      if (gamePill) {
+        gamePill.classList.remove('bump');
+        void gamePill.offsetWidth;
+        gamePill.classList.add('bump');
+        setTimeout(() => gamePill.classList.remove('bump'), 240);
+      }
+      if ($('coins')) $('coins').textContent = (this.state.sparks || 0).toLocaleString();
+      if ($('gameCoins')) $('gameCoins').textContent = (this.state.sparks || 0).toLocaleString();
     }
 
     chooseWord(btn, event) {
@@ -1307,16 +1320,27 @@
       setTimeout(() => this.finishRun(false, true), 560);
     }
 
-    showRelationReveal() {
+    showRelationReveal(rewardInfo) {
       const modal = document.getElementById('relationReveal');
       if (!modal || !this.activeSet) return;
 
-      this.canSkipRevealAfter = Date.now() + 450; // Protect against accidental double-taps immediately dismissing modal
+      this.canSkipRevealAfter = Date.now() + 750; // Protect against accidental double-taps immediately dismissing modal
 
       const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
       const themeEl = document.getElementById('relationTheme');
       if (themeEl) {
         themeEl.textContent = connectionTitle;
+      }
+
+      const sparksPill = document.getElementById('relationSparksPill');
+      if (sparksPill && rewardInfo) {
+        if (rewardInfo.isPractice) {
+          sparksPill.textContent = `🎯 STREAK ${this.streak}`;
+          sparksPill.classList.add('is-practice');
+        } else {
+          sparksPill.textContent = rewardInfo.label;
+          sparksPill.classList.remove('is-practice');
+        }
       }
 
       const wordsEl = document.getElementById('relationWords');
@@ -1346,7 +1370,9 @@
       this.countdownInterval = setInterval(() => {
         const elapsed = (Date.now() - startRevealTime) / 1000;
         const rem = Math.max(0, totalSec - elapsed);
-        if (secEl) secEl.textContent = `NEXT IN ${rem.toFixed(1)}s`;
+        if (secEl) {
+          secEl.textContent = `NEXT IN ${rem.toFixed(1)}s`;
+        }
         if (rem <= 0) {
           clearInterval(this.countdownInterval);
           this.countdownInterval = null;
@@ -1376,10 +1402,93 @@
       if (fillEl) {
         fillEl.classList.remove('animating');
       }
+      const zapPill = document.getElementById('centerZapPill');
+      if (zapPill) {
+        zapPill.classList.add('hidden');
+        zapPill.classList.remove('popping', 'zapping', 'dissolving');
+      }
+    }
+
+    triggerCenterZap(gained, zapLabelText, zapSubText, isPractice) {
+      const pill = document.getElementById('centerZapPill');
+      if (!pill) return;
+
+      const iconEl = document.getElementById('zapIcon');
+      const labelEl = document.getElementById('zapLabel');
+      const subEl = document.getElementById('zapSub');
+
+      if (iconEl) iconEl.textContent = isPractice ? '🎯' : '⚡';
+      if (labelEl) labelEl.textContent = zapLabelText;
+      if (subEl) subEl.textContent = zapSubText || '';
+
+      // Reset CSS classes
+      pill.classList.remove('hidden', 'popping', 'zapping', 'dissolving', 'is-practice', 'is-boosted');
+      if (isPractice) {
+        pill.classList.add('is-practice');
+      } else if (this.boost2xActive) {
+        pill.classList.add('is-boosted');
+      }
+
+      // Calculate vector from viewport center to the game header sparks pill (#gameCoinsPill or #coinsPill)
+      const gameCoinsPill = document.getElementById('gameCoinsPill');
+      const coinsPill = document.getElementById('coinsPill');
+      const targetPill = (gameCoinsPill && gameCoinsPill.offsetParent !== null) ? gameCoinsPill : coinsPill;
+      const targetRect = targetPill ? targetPill.getBoundingClientRect() : { left: window.innerWidth / 2 - 25, top: 16, width: 50, height: 28 };
+      const centerX = window.innerWidth / 2;
+      const centerY = window.innerHeight * 0.35;
+      const targetX = targetRect.left + targetRect.width / 2;
+      const targetY = targetRect.top + targetRect.height / 2;
+
+      pill.style.setProperty('--zap-dx', `${targetX - centerX}px`);
+      pill.style.setProperty('--zap-dy', `${targetY - centerY}px`);
+
+      // Pop into screen center with juicy spring bounce
+      pill.classList.add('popping');
+      if (window.oneShotFX) {
+        window.oneShotFX.sparkBurst(centerX, centerY, isPractice ? '#33e6ff' : '#ffdc48');
+      }
+
+      if (this.zapTimeout) clearTimeout(this.zapTimeout);
+      if (this.zapFlightTimeout) clearTimeout(this.zapFlightTimeout);
+
+      if (isPractice || gained === 0) {
+        // Untimed practice mode: smooth dissolve without currency flight
+        this.zapTimeout = setTimeout(() => {
+          pill.classList.remove('popping');
+          pill.classList.add('dissolving');
+          this.zapFlightTimeout = setTimeout(() => {
+            pill.classList.add('hidden');
+            pill.classList.remove('dissolving');
+          }, 320);
+        }, 420);
+      } else {
+        // Timed mode: Launch electric laser flight to sparks balance!
+        this.zapTimeout = setTimeout(() => {
+          pill.classList.remove('popping');
+          pill.classList.add('zapping');
+
+          if (window.oneShotAudio && typeof window.oneShotAudio.playZap === 'function') {
+            window.oneShotAudio.playZap();
+          }
+          if (window.oneShotFX && typeof window.oneShotFX.zapTrail === 'function') {
+            window.oneShotFX.zapTrail(centerX, centerY, targetX, targetY, '#ffdc48');
+          }
+
+          // On arrival at top sparks pill
+          this.zapFlightTimeout = setTimeout(() => {
+            pill.classList.add('hidden');
+            pill.classList.remove('zapping');
+            this.bumpCoinsPill();
+            if (window.oneShotFX) {
+              window.oneShotFX.sparkBurst(targetX, targetY, '#ffdc48');
+            }
+          }, 360);
+        }, 420);
+      }
     }
 
     skipThemeReveal() {
-      // Debounce fast taps for 450ms so an answer click never prematurely dismisses the modal
+      // Debounce fast taps for 750ms so an answer click never prematurely dismisses the modal
       if (this.canSkipRevealAfter && Date.now() < this.canSkipRevealAfter) {
         return;
       }
@@ -1543,33 +1652,50 @@
         });
       }
 
+      // Prepare dynamic label and subtitle for Center Zap Pill & Relation Card
+      let zapLabel = `+${gained} ⚡`;
+      let zapSub = '';
       if (isUnlimited) {
-        // Unlimited Practice Mode: Crisp, non-monetary feedback focused on streak & learning
+        zapLabel = `STREAK ${this.streak}`;
+        zapSub = reward.isMilestone ? 'PRACTICE MILESTONE!' : 'PRACTICE';
+      } else if (isNewBest) {
+        zapLabel = `+${gained} ⚡`;
+        zapSub = this.boost2xActive ? 'NEW BEST! (2X)' : 'NEW BEST!';
+      } else if (this.boost2xActive) {
+        zapLabel = `+${gained} ⚡`;
+        zapSub = '2X BOOST!';
+      } else if (reward.isMilestone) {
+        zapLabel = `+${gained} ⚡`;
+        zapSub = `STREAK ${this.streak}!`;
+      } else if (Number.isFinite(remSec) && remSec <= 1.1) {
+        zapLabel = `+${gained} ⚡`;
+        zapSub = `CLUTCH ${remSec.toFixed(1)}s!`;
+      } else if (reward.bonusTag) {
+        zapLabel = `+${gained} ⚡`;
+        zapSub = reward.bonusTag.trim();
+      }
+
+      if (isUnlimited) {
         if (reward.isMilestone) {
           if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
           if (window.oneShotFX) window.oneShotFX.confettiShower(40);
-          this.showFloatingBurst(`🎯 PRACTICE STREAK ${this.streak}!`);
         } else {
           if (window.oneShotAudio) window.oneShotAudio.playCorrect(this.streak);
-          this.showFloatingBurst(`🎯 STREAK ${this.streak}`);
         }
       } else {
-        const boostSuffix = this.boost2xActive ? ' (2X!)' : '';
         if (isNewBest) {
           if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
           if (window.oneShotFX) window.oneShotFX.confettiShower(75);
-          this.showFloatingBurst(`🏆 NEW BEST! +${gained} ⚡${boostSuffix}`);
         } else if (reward.isMilestone) {
           if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
           if (window.oneShotFX) window.oneShotFX.confettiShower(50);
-          this.showFloatingBurst(`${reward.bonusTag}+${gained} ⚡${boostSuffix}`);
         } else {
           if (window.oneShotAudio) window.oneShotAudio.playCorrect(this.streak);
-          const clutchTag = Number.isFinite(remSec) && remSec <= 1.1 ? `CLUTCH ${remSec.toFixed(1)}s! ` : '';
-          const tag = reward.bonusTag || clutchTag;
-          this.showFloatingBurst(`${tag}+${gained} ⚡${boostSuffix}`);
         }
       }
+
+      // 1. Trigger the center feedback zap pill!
+      this.triggerCenterZap(gained, zapLabel, zapSub, isUnlimited);
 
       const streakEl = document.getElementById('streak');
       if (streakEl) streakEl.textContent = String(this.streak);
@@ -1579,8 +1705,8 @@
         barEl.style.width = `${pct}%`;
       }
 
-      // Display mid-screen common relation reveal with a 2.5s pause
-      this.showRelationReveal();
+      // 2. Display mid-screen common relation reveal with a 2.5s pause
+      this.showRelationReveal({ label: zapLabel, sub: zapSub, isPractice: isUnlimited });
 
       const pauseDuration = 2500; // 2.5s pause, can be skipped anytime by tapping anywhere after brief debounce
       if (this.themeRevealTimer) {
@@ -2697,6 +2823,7 @@
 
   const app = new OneShotApp();
   window.app = app;
+  window.appVersion = APP_VERSION;
 
   window.startGame = () => app.startQuickShot();
   window.showScreen = (id) => app.showScreen(id);

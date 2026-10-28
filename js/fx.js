@@ -167,6 +167,41 @@
       this.startLoop();
     }
 
+    // Electric spark arc when center feedback zaps to balance pill
+    zapTrail(startX, startY, endX, endY, color = '#ffdc48') {
+      if (this.reducedMotion) return;
+      this.init();
+      const steps = 14;
+      const dx = (endX - startX) / steps;
+      const dy = (endY - startY) / steps;
+
+      for (let i = 0; i <= steps; i++) {
+        const t = i / steps;
+        // Jitter lightning arc perpendicularly to trajectory
+        const perpX = -(endY - startY);
+        const perpY = endX - startX;
+        const len = Math.hypot(perpX, perpY) || 1;
+        const jitter = Math.sin(t * Math.PI) * (Math.random() - 0.5) * 26;
+        const x = startX + dx * i + (perpX / len) * jitter;
+        const y = startY + dy * i + (perpY / len) * jitter;
+
+        this.particles.push({
+          type: 'spark',
+          x,
+          y,
+          vx: (Math.random() - 0.5) * 2.2,
+          vy: (Math.random() - 0.5) * 2.2,
+          gravity: 0.05,
+          friction: 0.92,
+          size: 3 + Math.random() * 3.5,
+          color: Math.random() > 0.35 ? color : '#33e6ff',
+          life: 0.85,
+          decay: 0.045 + Math.random() * 0.025
+        });
+      }
+      this.startLoop();
+    }
+
     screenShake(intensity = 6) {
       if (this.reducedMotion) return;
       const el = document.querySelector('.app');
