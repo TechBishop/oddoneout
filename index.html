@@ -34,16 +34,6 @@
 </head>
 <body>
 <main class="app">
-  <header>
-    <button class="coins" id="coinsPill" onclick="app.handleHeaderNav('themes')" title="Sparks Balance">
-      ⚡ <span id="coins">0</span>
-    </button>
-    <div class="header-actions">
-      <button class="icon-btn" onclick="app.handleHeaderNav('packs')" aria-label="Packs and Cosmetics Shop" title="Packs & Cosmetics">🎨</button>
-      <button class="icon-btn" id="settingsBtn" onclick="app.openSettings()" aria-label="Settings and Pause" title="Settings">⚙️</button>
-    </div>
-  </header>
-
   <div class="float-feedback" id="floatFeedback" aria-live="polite">+10 ⚡</div>
 
   <!-- HOME SCREEN -->
@@ -53,54 +43,73 @@
       <button class="pack-bar-btn" onclick="app.clearDuel()">CLEAR</button>
     </div>
 
-    <div class="hero">
-      <h1>FIND THE<br><em>ODD ONE OUT.</em></h1>
+    <!-- HERO WITH INLINE SPARKS, TITLE & SETTINGS -->
+    <div class="hero home-hero">
+      <div class="hero-top-row">
+        <!-- Sparks balance on the left -->
+        <button class="coins hero-coins" id="coinsPill" onclick="app.handleHeaderNav('themes')" title="Sparks Balance">
+          ⚡ <span id="coins">0</span>
+        </button>
+
+        <!-- Centered Title -->
+        <div class="hero-title-box">
+          <h1 class="hero-title">FIND THE<br><em>ODD ONE OUT.</em></h1>
+        </div>
+
+        <!-- Themes & Settings icons on the right -->
+        <div class="hero-actions">
+          <button class="icon-btn" onclick="app.handleHeaderNav('packs')" aria-label="Packs and Cosmetics Shop" title="Packs & Cosmetics">🎨</button>
+          <button class="icon-btn" id="settingsBtn" onclick="app.openSettings()" aria-label="Settings and Pause" title="Settings">⚙️</button>
+        </div>
+      </div>
       <p class="sub">Find the <span class="color-word">word</span> that does <b class="color-not">NOT</b> belong before <span class="color-time">time runs out</span>.</p>
     </div>
 
-    <!-- TOP 3 STATS IN VERTICAL LIST -->
-    <div class="stats-list">
-      <div class="stat-row" title="Your highest consecutive streak record">
-        <div class="stat-row-left">
-          <span class="stat-row-icon">🏆</span>
-          <span class="stat-row-label">BEST STREAK</span>
+    <!-- 3 STATS IN HORIZONTAL GRID -->
+    <div class="stats-grid-3">
+      <div class="stat-card" title="Your highest consecutive streak record">
+        <span class="stat-card-icon">🏆</span>
+        <div class="stat-card-info">
+          <span class="stat-card-label">BEST</span>
+          <b class="stat-card-value" id="homeBest">0</b>
         </div>
-        <b class="stat-row-value" id="homeBest">0</b>
       </div>
 
-      <div class="stat-row" onclick="app.startDailyTarget()" style="cursor:pointer;" title="Consecutive days played. Tap to jump into today's Daily Challenge!">
-        <div class="stat-row-left">
-          <span class="stat-row-icon">🔥</span>
-          <span class="stat-row-label">DAILY STREAK</span>
+      <div class="stat-card" onclick="app.startDailyTarget()" style="cursor:pointer;" title="Consecutive days played. Tap to jump into today's Daily Challenge!">
+        <span class="stat-card-icon">🔥</span>
+        <div class="stat-card-info">
+          <span class="stat-card-label">DAILY</span>
+          <b class="stat-card-value" id="homeDailyStreak">0🔥</b>
         </div>
-        <b class="stat-row-value" id="homeDailyStreak">0🔥</b>
       </div>
 
-      <div class="stat-row" onclick="app.openShop('packs')" style="cursor:pointer;" title="Active prompt cards. Tap to toggle topics!">
-        <div class="stat-row-left">
-          <span class="stat-row-icon">📚</span>
-          <span class="stat-row-label">PROMPTS ACTIVE</span>
+      <div class="stat-card" onclick="app.openShop('packs')" style="cursor:pointer;" title="Active prompt cards. Tap to toggle topics!">
+        <span class="stat-card-icon">📚</span>
+        <div class="stat-card-info">
+          <span class="stat-card-label">ACTIVE</span>
+          <b class="stat-card-value" id="homePackCount">1,260</b>
         </div>
-        <b class="stat-row-value" id="homePackCount">1,260</b>
       </div>
     </div>
 
-    <!-- SELECTION BARS -->
-    <button class="pack-bar" onclick="app.openShop('packs')" type="button">
-      <span class="pack-bar-label">
-        <span class="pack-bar-prefix">TOPICS</span>
-        <strong class="pack-bar-value" id="activePackName">3 Topics (1,260 Prompts)</strong>
-      </span>
-      <span class="pack-bar-chip">CHANGE ▸</span>
-    </button>
+    <!-- SELECTION BARS (2-COL ROW) -->
+    <div class="home-bars-row">
+      <button class="pack-bar" onclick="app.openShop('packs')" type="button">
+        <span class="pack-bar-label">
+          <span class="pack-bar-prefix">TOPICS</span>
+          <strong class="pack-bar-value" id="activePackName">3 Topics (1,260)</strong>
+        </span>
+        <span class="pack-bar-chip">▸</span>
+      </button>
 
-    <button class="pack-bar pace-bar" id="homePaceBar" onclick="app.cycleTimerPace()" type="button" aria-label="Timer Mode Pace">
-      <span class="pack-bar-label">
-        <span class="pack-bar-prefix">TIMER SPEED</span>
-        <strong class="pack-bar-value" id="homePaceLabel">PROGRESSIVE (12s)</strong>
-      </span>
-      <span class="pack-bar-chip" id="homePaceChip">CHANGE ▸</span>
-    </button>
+      <button class="pack-bar pace-bar" id="homePaceBar" onclick="app.cycleTimerPace()" type="button" aria-label="Timer Mode Pace">
+        <span class="pack-bar-label">
+          <span class="pack-bar-prefix">TIMER PACE</span>
+          <strong class="pack-bar-value" id="homePaceLabel">PROGRESSIVE (12s)</strong>
+        </span>
+        <span class="pack-bar-chip" id="homePaceChip">▸</span>
+      </button>
+    </div>
 
     <!-- PRIMARY PLAY BUTTON -->
     <button class="primary" id="playQuickBtn" onclick="app.startQuickShot()">START (1,260 PROMPTS)</button>
