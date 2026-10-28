@@ -1,0 +1,42 @@
+{
+  "name": "Odd One Out",
+  "short_name": "Odd One Out",
+  "description": "A rapid-fire word game. Spot the connection and tap the odd one out before time runs out!",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080915",
+  "theme_color": "#080915",
+  "categories": ["games", "trivia", "word", "puzzle"],
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Play Quick Shot",
+      "short_name": "Quick Shot",
+      "description": "Start a fast solo run immediately",
+      "url": "./index.html?mode=quick",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Play Daily Target",
+      "short_name": "Daily Target",
+      "description": "Play today's curated 5-round challenge",
+      "url": "./index.html?mode=daily",
+      "icons": [{ "src": "./icons/icon.svg", "sizes": "192x192" }]
+    }
+  ]
+}
