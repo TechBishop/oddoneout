@@ -192,12 +192,48 @@
 
     <div class="game-body">
       <div class="card prompt" id="promptCard">
-        <span class="tag" id="category">CATEGORY</span>
-        <h2 id="promptHeadline">Which word does NOT belong?</h2>
-        <p id="promptSub">Three words share a theme. One does not.</p>
+        <span class="tag hidden" id="category" style="display:none;"></span>
+        <h2 id="promptHeadline">Which doesn't belong?</h2>
+        <p id="promptSub">Spot the odd word out</p>
       </div>
 
       <div class="choices" id="choices" role="group" aria-label="Word choices"></div>
+    </div>
+
+    <!-- MID-SCREEN COMMON RELATION REVEAL (Pops up when correct — NYT Connections style) -->
+    <div class="relation-reveal hidden" id="relationReveal" onclick="app.skipThemeReveal()" role="dialog" aria-modal="true" aria-label="Connection Reveal">
+      <div class="card relation-card" onclick="event.stopPropagation(); app.skipThemeReveal();">
+        <div class="relation-badge">
+          <span class="relation-icon">✨</span>
+          <span class="relation-badge-text">THE CONNECTION</span>
+          <span class="relation-check">✓</span>
+        </div>
+
+        <!-- 1-2 words for what was supposed to match! -->
+        <div class="relation-theme" id="relationTheme">PRIMARY COLORS</div>
+
+        <!-- Connected matching word chips -->
+        <div class="relation-words" id="relationWords"></div>
+
+        <!-- Punchy intruder callout: "Toaster ✕ Kitchen Appliance" -->
+        <div class="relation-intruder-tag" id="relationIntruderTag">
+          <span class="intruder-pill">ODD</span>
+          <strong class="intruder-name" id="relationIntruderName">Toaster</strong>
+          <span class="intruder-reason" id="relationIntruderReason">✕ Appliance</span>
+        </div>
+
+        <div class="relation-footer">
+          <div class="relation-countdown" id="relationCountdown">
+            <div class="countdown-bar-wrap">
+              <div class="relation-timer-fill" id="relationTimerFill"></div>
+            </div>
+            <div class="countdown-sub">
+              <span class="countdown-sec" id="relationCountdownSec">NEXT IN 2s</span>
+              <span class="countdown-tap">TAP ANYWHERE TO SKIP ▸</span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="progress"><i id="bar"></i></div>
@@ -215,11 +251,15 @@
     <!-- Explanation Card -->
     <div class="explanation-card" id="explanationCard">
       <div class="explanation-head">
-        <span id="explainCategory">CATEGORY</span>
-        <span class="explanation-intruder" id="explainIntruder">ANSWER: —</span>
+        <span class="explanation-tag">THE CONNECTION</span>
+        <strong class="explanation-theme" id="explainCategory">PRIMARY COLORS</strong>
       </div>
-      <div class="explanation-body" id="explainText">Explanation appears here.</div>
-      <div class="explanation-valid" id="explainValid">Matching words: —</div>
+      <div class="explanation-words" id="explainValid">Red · Blue · Yellow</div>
+      <div class="explanation-intruder-box">
+        <span class="intruder-pill">ODD</span>
+        <strong id="explainIntruder">Toaster</strong>
+        <span class="intruder-reason" id="explainReason">✕ Appliance</span>
+      </div>
     </div>
 
     <div class="card scorebox">
@@ -394,7 +434,10 @@
   </div>
 </div>
 
+<canvas id="fxCanvas" class="fx-canvas"></canvas>
+
 <script src="./js/packs-data.js"></script>
+<script src="./js/fx.js"></script>
 <script src="./js/audio.js"></script>
 <script src="./js/analytics.js"></script>
 <script src="./js/app.js"></script>
