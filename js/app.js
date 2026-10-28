@@ -517,9 +517,14 @@
         }
       }
 
+      const pace = (this.state.settings && this.state.settings.timerPace) || 'progressive';
+
       // Play CTA Button — direct and jargon-free with live prompt count
       if ($('playQuickBtn') && !this.duelSeed) {
-        $('playQuickBtn').textContent = `START (${fmtTotal} PROMPTS)`;
+        $('playQuickBtn').textContent =
+          pace === 'unlimited'
+            ? `PRACTICE (${fmtTotal} PROMPTS)`
+            : `START (${fmtTotal} PROMPTS)`;
       }
 
       const today = getTodayKey();
@@ -532,11 +537,10 @@
       }
 
       // Sync Timer Pace descriptions on Home & How-To
-      const pace = (this.state.settings && this.state.settings.timerPace) || 'progressive';
       if ($('homeStep2Text')) {
         $('homeStep2Text').textContent =
           pace === 'unlimited'
-            ? 'No timer — play at your own speed'
+            ? 'Untimed practice sandbox — 0 sparks earned'
             : pace === 'relaxed'
             ? 'Relaxed 15s timer'
             : pace === 'blitz'
@@ -546,7 +550,7 @@
       if ($('homePaceLabel')) {
         $('homePaceLabel').textContent =
           pace === 'unlimited'
-            ? 'UNLIMITED (No Timer)'
+            ? 'UNLIMITED (PRACTICE)'
             : pace === 'relaxed'
             ? 'RELAXED (15s)'
             : pace === 'blitz'
@@ -558,11 +562,11 @@
       }
       if ($('howtoCurveTag') && $('howtoCurveBody')) {
         if (pace === 'unlimited') {
-          $('howtoCurveTag').textContent = '∞ Untimed';
+          $('howtoCurveTag').textContent = '🎯 Practice Sandbox';
           $('howtoCurveBody').innerHTML =
-            '• <b>No Time Limit:</b> Play completely untimed at your own speed.<br>' +
-            '• <b>Difficulty:</b> Words still scale in difficulty as your streak grows.<br>' +
-            '• <b>Sparks:</b> Practice mode awards +2 sparks per hit, plus +10 bonus every 5 streak!';
+            '• <b>Untimed Practice:</b> Play completely relaxed with zero time limit.<br>' +
+            '• <b>Learn Connections:</b> Perfect for discovering new words and studying associations.<br>' +
+            '• <b>Sparks:</b> 0 ⚡ (Practice Mode earns 0 sparks to prevent ad exploits. Switch to Progressive or Blitz to earn sparks!).';
         } else if (pace === 'relaxed') {
           $('howtoCurveTag').textContent = '15s ➔ 5.0s';
           $('howtoCurveBody').innerHTML =
@@ -703,7 +707,7 @@
           difficulty: tier,
           weights: weights,
           phase: 'unlimited',
-          label: 'UNLIMITED · ∞ TIME'
+          label: 'PRACTICE · UNTIMED'
         };
       }
 
@@ -850,8 +854,10 @@
       this.newBestAwardedThisRun = false;
       this.roundHistory = [];
 
-      // Check & consume 2X sparks boost from rewarded ad
-      if (this.state.nextRound2xBoost) {
+      const isPracticeUnlimited = this.state.settings && this.state.settings.timerPace === 'unlimited';
+
+      // Check & consume 2X sparks boost ONLY for timed runs (preserve boost for practice mode!)
+      if (this.state.nextRound2xBoost && !isPracticeUnlimited) {
         this.boost2xActive = true;
         this.state.nextRound2xBoost = false;
         this.saveState();
@@ -900,7 +906,7 @@
       this.newBestAwardedThisRun = false;
       this.roundHistory = [];
 
-      // Check & consume 2X sparks boost from rewarded ad
+      // Daily Challenge is always a timed challenge (12s) - consume 2X sparks boost if active
       if (this.state.nextRound2xBoost) {
         this.boost2xActive = true;
         this.state.nextRound2xBoost = false;
@@ -1394,16 +1400,13 @@
       const tier = this.activeSet && this.activeSet.tier ? this.activeSet.tier : Math.min(5, Math.floor(this.streak / 5) + 1);
       const isMilestone = this.streak % 5 === 0;
 
-      // 1. Unlimited (Practice) Mode: Minimal sparks (1-2 base, +3 on milestones)
+      // 1. Unlimited (Practice) Mode: Pure practice sandbox — 0 sparks earned (prevents 2X ad boost exploit)
       if (pace === 'unlimited') {
-        let base = 1;
-        if (tier >= 4) base = 2;
-        const milestoneBonus = isMilestone ? 3 : 0;
         return {
-          total: base + milestoneBonus,
-          base,
-          bonus: milestoneBonus,
-          bonusTag: isMilestone ? 'PRACTICE MILESTONE! ' : '',
+          total: 0,
+          base: 0,
+          bonus: 0,
+          bonusTag: isMilestone ? '🎯 PRACTICE MILESTONE! ' : '',
           isMilestone
         };
       }
@@ -1497,16 +1500,19 @@
 
     handleCorrectHit(remSec) {
       this.streak += 1;
+      const pace = (this.state.settings && this.state.settings.timerPace) || 'progressive';
+      const isUnlimited = pace === 'unlimited';
 
       const reward = this.calculateSparksGained(remSec);
       let gained = reward.total;
 
       let isNewBest = false;
-      if (this.mode !== 'daily' && this.streak > this.state.bestStreak) {
+      // High score best streak is earned in competitive timed modes (not untimed practice sandbox)
+      if (this.mode !== 'daily' && !isUnlimited && this.streak > this.state.bestStreak) {
         this.state.bestStreak = this.streak;
         if (!this.newBestAwardedThisRun) {
           this.newBestAwardedThisRun = true;
-          const bestBonus = this.state.settings.timerPace === 'unlimited' ? 5 : this.state.settings.timerPace === 'blitz' ? 50 : 35;
+          const bestBonus = pace === 'blitz' ? 50 : 35;
           gained += bestBonus;
           isNewBest = true;
           if (window.oneShotAnalytics) {
@@ -1515,15 +1521,17 @@
         }
       }
 
-      // Multiply sparks if 2X rewarded ad boost is active
-      if (this.boost2xActive) {
+      // Multiply sparks if 2X rewarded ad boost is active (only on timed runs)
+      if (this.boost2xActive && !isUnlimited) {
         gained *= 2;
       }
 
-      this.runSparks += gained;
-      this.state.sparks += gained;
-      this.saveState();
-      this.bumpCoinsPill();
+      if (!isUnlimited && gained > 0) {
+        this.runSparks += gained;
+        this.state.sparks += gained;
+        this.saveState();
+        this.bumpCoinsPill();
+      }
 
       if (window.oneShotAnalytics) {
         window.oneShotAnalytics.track('answer_correct', {
@@ -1535,20 +1543,32 @@
         });
       }
 
-      const boostSuffix = this.boost2xActive ? ' (2X!)' : '';
-      if (isNewBest) {
-        if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
-        if (window.oneShotFX) window.oneShotFX.confettiShower(75);
-        this.showFloatingBurst(`🏆 NEW BEST! +${gained} ⚡${boostSuffix}`);
-      } else if (reward.isMilestone) {
-        if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
-        if (window.oneShotFX) window.oneShotFX.confettiShower(50);
-        this.showFloatingBurst(`${reward.bonusTag}+${gained} ⚡${boostSuffix}`);
+      if (isUnlimited) {
+        // Unlimited Practice Mode: Crisp, non-monetary feedback focused on streak & learning
+        if (reward.isMilestone) {
+          if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
+          if (window.oneShotFX) window.oneShotFX.confettiShower(40);
+          this.showFloatingBurst(`🎯 PRACTICE STREAK ${this.streak}!`);
+        } else {
+          if (window.oneShotAudio) window.oneShotAudio.playCorrect(this.streak);
+          this.showFloatingBurst(`🎯 STREAK ${this.streak}`);
+        }
       } else {
-        if (window.oneShotAudio) window.oneShotAudio.playCorrect(this.streak);
-        const clutchTag = Number.isFinite(remSec) && remSec <= 1.1 ? `CLUTCH ${remSec.toFixed(1)}s! ` : '';
-        const tag = reward.bonusTag || clutchTag;
-        this.showFloatingBurst(`${tag}+${gained} ⚡${boostSuffix}`);
+        const boostSuffix = this.boost2xActive ? ' (2X!)' : '';
+        if (isNewBest) {
+          if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
+          if (window.oneShotFX) window.oneShotFX.confettiShower(75);
+          this.showFloatingBurst(`🏆 NEW BEST! +${gained} ⚡${boostSuffix}`);
+        } else if (reward.isMilestone) {
+          if (window.oneShotAudio) window.oneShotAudio.playMilestone(this.streak);
+          if (window.oneShotFX) window.oneShotFX.confettiShower(50);
+          this.showFloatingBurst(`${reward.bonusTag}+${gained} ⚡${boostSuffix}`);
+        } else {
+          if (window.oneShotAudio) window.oneShotAudio.playCorrect(this.streak);
+          const clutchTag = Number.isFinite(remSec) && remSec <= 1.1 ? `CLUTCH ${remSec.toFixed(1)}s! ` : '';
+          const tag = reward.bonusTag || clutchTag;
+          this.showFloatingBurst(`${tag}+${gained} ⚡${boostSuffix}`);
+        }
       }
 
       const streakEl = document.getElementById('streak');
@@ -1680,19 +1700,21 @@
         }
       }
 
+      const isUnlimited = this.state.settings && this.state.settings.timerPace === 'unlimited';
+
       if ($('finalScore')) $('finalScore').textContent = String(this.streak);
-      if ($('finalBest')) $('finalBest').textContent = String(this.state.bestStreak);
+      if ($('finalBest')) $('finalBest').textContent = isUnlimited ? `${this.state.bestStreak} (TIMED)` : String(this.state.bestStreak);
       if ($('finalCoins')) {
-        $('finalCoins').textContent = this.boost2xActive ? `+${this.runSparks} (2X ⚡)` : `+${this.runSparks}`;
+        $('finalCoins').textContent = isUnlimited ? '0 (PRACTICE)' : (this.boost2xActive ? `+${this.runSparks} (2X ⚡)` : `+${this.runSparks}`);
       }
 
       this.savedDeathStreak = this.streak;
 
-      // Update Revive rewarded ad offer button
+      // Update Revive rewarded ad offer button (disabled in untimed practice)
       const reviveBtn = $('reviveAdBtn');
       const reviveLabel = $('reviveStreakLabel');
       if (reviveBtn) {
-        const canRevive = !completedDaily && !this.continueUsedThisRun && this.mode !== 'duel';
+        const canRevive = !isUnlimited && !completedDaily && !this.continueUsedThisRun && this.mode !== 'duel';
         reviveBtn.style.display = canRevive ? 'flex' : 'none';
         if (canRevive && reviveLabel) {
           reviveLabel.textContent = this.streak > 0
@@ -2579,7 +2601,7 @@
         const pace = s.timerPace || 'progressive';
         $('togglePace').textContent =
           pace === 'unlimited'
-            ? 'UNLIMITED (∞)'
+            ? 'PRACTICE (0⚡)'
             : pace === 'relaxed'
             ? 'RELAXED'
             : pace === 'blitz'
@@ -2589,7 +2611,7 @@
         if ($('paceSettingSub')) {
           $('paceSettingSub').textContent =
             pace === 'unlimited'
-              ? 'No timer — play completely at your own speed'
+              ? 'Untimed practice sandbox — 0 sparks earned'
               : pace === 'relaxed'
               ? '15s timer, gentle pace down to 5s'
               : pace === 'blitz'
@@ -2642,7 +2664,7 @@
       if (window.oneShotAudio) window.oneShotAudio.playTap();
 
       if (next === 'unlimited') {
-        this.showFloatingBurst('∞ Unlimited (No Timer)');
+        this.showFloatingBurst('🎯 Unlimited (Practice — 0 Sparks)');
       } else if (next === 'relaxed') {
         this.showFloatingBurst('🌴 Relaxed Timer (15s ➔ 5.0s)');
       } else if (next === 'blitz') {
