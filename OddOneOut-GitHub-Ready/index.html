@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#080915">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Odd One Out">
+  <meta name="description" content="Odd One Out — Fast mobile word game. Spot the connection and find the odd one out before time runs out!">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
+  <link rel="apple-touch-icon" href="./icons/icon.svg">
+  <title>Odd One Out — Fast Word Game</title>
+  <link rel="stylesheet" href="./styles.css">
+
+  <!-- GOOGLE ADSENSE (H5 GAMES ADS API) -->
+  <script async
+    data-ad-client="ca-pub-2691430114035059"
+    data-ad-frequency-hint="30s"
+    data-adbreak-test="on"
+    crossorigin="anonymous"
+    src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js">
+  </script>
+  <script>
+    window.adsbygoogle = window.adsbygoogle || [];
+    window.adBreak = function(o) { adsbygoogle.push(o); };
+    window.adConfig = function(o) { adsbygoogle.push(o); };
+  </script>
+</head>
+<body>
+<main class="app">
+  <header>
+    <button class="coins" id="coinsPill" onclick="app.handleHeaderNav('themes')" title="Sparks Balance">
+      ⚡ <span id="coins">0</span>
+    </button>
+    <div class="header-actions">
+      <button class="icon-btn" onclick="app.handleHeaderNav('packs')" aria-label="Packs and Cosmetics Shop" title="Packs & Cosmetics">🎨</button>
+      <button class="icon-btn" id="settingsBtn" onclick="app.openSettings()" aria-label="Settings and Pause" title="Settings">⚙️</button>
+    </div>
+  </header>
+
+  <div class="float-feedback" id="floatFeedback" aria-live="polite">+10 ⚡</div>
+
+  <!-- HOME SCREEN -->
+  <section class="screen active" id="home">
+    <div class="duel-banner hidden" id="duelBanner">
+      <span>⚔️ <strong>CHALLENGE ACTIVE</strong> · Beat a <b id="duelTargetScore">0</b> streak!</span>
+      <button class="pack-bar-btn" onclick="app.clearDuel()">CLEAR</button>
+    </div>
+
+    <div class="hero">
+      <h1>FIND THE<br><em>ODD ONE OUT.</em></h1>
+      <p class="sub">Find the <span class="color-word">word</span> that does <b class="color-not">NOT</b> belong before <span class="color-time">time runs out</span>.</p>
+    </div>
+
+    <!-- TOP 3 STATS IN VERTICAL LIST -->
+    <div class="stats-list">
+      <div class="stat-row" title="Your highest consecutive streak record">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">🏆</span>
+          <span class="stat-row-label">BEST STREAK</span>
+        </div>
+        <b class="stat-row-value" id="homeBest">0</b>
+      </div>
+
+      <div class="stat-row" onclick="app.startDailyTarget()" style="cursor:pointer;" title="Consecutive days played. Tap to jump into today's Daily Challenge!">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">🔥</span>
+          <span class="stat-row-label">DAILY STREAK</span>
+        </div>
+        <b class="stat-row-value" id="homeDailyStreak">0🔥</b>
+      </div>
+
+      <div class="stat-row" onclick="app.openShop('packs')" style="cursor:pointer;" title="Active prompt cards. Tap to toggle topics!">
+        <div class="stat-row-left">
+          <span class="stat-row-icon">📚</span>
+          <span class="stat-row-label">PROMPTS ACTIVE</span>
+        </div>
+        <b class="stat-row-value" id="homePackCount">1,260</b>
+      </div>
+    </div>
+
+    <!-- SELECTION BARS -->
+    <button class="pack-bar" onclick="app.openShop('packs')" type="button">
+      <span class="pack-bar-label">
+        <span class="pack-bar-prefix">TOPICS</span>
+        <strong class="pack-bar-value" id="activePackName">3 Topics (1,260 Prompts)</strong>
+      </span>
+      <span class="pack-bar-chip">CHANGE ▸</span>
+    </button>
+
+    <button class="pack-bar pace-bar" id="homePaceBar" onclick="app.cycleTimerPace()" type="button" aria-label="Timer Mode Pace">
+      <span class="pack-bar-label">
+        <span class="pack-bar-prefix">TIMER SPEED</span>
+        <strong class="pack-bar-value" id="homePaceLabel">PROGRESSIVE (12s)</strong>
+      </span>
+      <span class="pack-bar-chip" id="homePaceChip">CHANGE ▸</span>
+    </button>
+
+    <!-- PRIMARY PLAY BUTTON -->
+    <button class="primary" id="playQuickBtn" onclick="app.startQuickShot()">START (1,260 PROMPTS)</button>
+
+    <!-- 3 BOTTOM MODE BUTTONS -->
+    <div class="mode-row mode-row-3">
+      <button class="secondary" onclick="app.startDailyTarget()">
+        <span class="badge-dot" id="dailyDot"></span>
+        <span id="dailyBtnLabel">🎯 DAILY</span>
+      </button>
+      <button class="secondary" onclick="app.openShop('themes')">
+        🎨 THEMES
+      </button>
+      <button class="secondary" onclick="app.showScreen('howto')">
+        ❔ HOW TO PLAY
+      </button>
+    </div>
+
+    <!-- 2X SPARKS AD REWARD BUTTON -->
+    <button class="boost-banner" id="boost2xBtn" onclick="app.handleBoost2xClick()" type="button" aria-label="2X Sparks Next Round">
+      <div class="boost-banner-left">
+        <span class="boost-icon" id="boost2xIcon">⚡</span>
+        <div class="boost-text-group">
+          <b class="boost-title" id="boost2xTitle">2X SPARKS NEXT ROUND</b>
+          <span class="boost-sub" id="boost2xSub">Watch a short ad to double all sparks</span>
+        </div>
+      </div>
+      <span class="boost-badge" id="boost2xBadge">📺 WATCH AD</span>
+    </button>
+  </section>
+
+  <!-- HOW IT WORKS SCREEN -->
+  <section class="screen" id="howto">
+    <div class="hero">
+      <div class="eyebrow">How to Play</div>
+      <h1>FIND THE<br><em>ODD ONE OUT.</em></h1>
+      <p class="sub">Three words share a hidden connection. One word does not belong. Tap the odd word out before time runs out.</p>
+    </div>
+
+    <div class="card prompt">
+      <span class="tag">EXAMPLE · SPACE</span>
+      <h2>Which word does NOT belong?</h2>
+      <p>Orbit, Comet, Crater… <b>Toaster</b>.</p>
+    </div>
+
+    <div class="explanation-card" style="margin-bottom:14px">
+      <div class="explanation-head">
+        <span>TIMER SPEED &amp; SPARKS</span>
+        <span class="explanation-intruder" id="howtoCurveTag">12s ➔ 3.5s</span>
+      </div>
+      <div class="explanation-body" id="howtoCurveBody">
+        • <b>Early Rounds (12s–10s):</b> Easy words with clear differences<br>
+        • <b>Mid Streak (9s–7s):</b> Closer topics that test your quick thinking<br>
+        • <b>High Streak (6s–3.5s):</b> Fast pace for serious focus<br>
+        • <b>Sparks:</b> +10 per correct answer, +50 bonus every 5 streak, +100 for a new personal best!
+      </div>
+    </div>
+
+    <button class="primary" onclick="app.startQuickShot()">START PLAYING</button>
+    <button class="secondary" onclick="app.showScreen('home')">BACK</button>
+  </section>
+
+  <!-- SHOP & PACKS SCREEN -->
+  <section class="screen" id="shop">
+    <div class="section-head">
+      <h2>TOPICS &amp; THEMES</h2>
+      <button class="pack-bar-btn" id="shopCloseBtn" onclick="app.closeShop()">✕ CLOSE</button>
+    </div>
+
+    <div class="tabs">
+      <button class="tab-btn active" id="tabBtnPacks" onclick="app.switchShopTab('packs')">TOPIC PACKS</button>
+      <button class="tab-btn" id="tabBtnThemes" onclick="app.switchShopTab('themes')">THEMES &amp; SKINS</button>
+    </div>
+
+    <div class="shop-list" id="shopList"></div>
+
+    <div class="shop-footer">
+      <button class="primary" id="playShopBtn" onclick="app.startFromShop()">START (1,260 PROMPTS)</button>
+    </div>
+  </section>
+
+  <!-- GAME SCREEN -->
+  <section class="screen" id="game">
+    <div class="game-head">
+      <div class="streak-box">
+        <div class="streak">STREAK <strong id="streak">0</strong> 🔥</div>
+        <div class="tier-pill warmup" id="tierLabel">WARMUP · 12.0S</div>
+      </div>
+      <div class="timer warmup" id="timer" style="--p:100%">
+        <span id="time">12</span>
+      </div>
+    </div>
+
+    <div class="game-body">
+      <div class="card prompt" id="promptCard">
+        <span class="tag" id="category">CATEGORY</span>
+        <h2 id="promptHeadline">Which word does NOT belong?</h2>
+        <p id="promptSub">Three words share a theme. One does not.</p>
+      </div>
+
+      <div class="choices" id="choices" role="group" aria-label="Word choices"></div>
+    </div>
+
+    <div class="progress"><i id="bar"></i></div>
+    <div class="small-center" id="gameFooter">ROUND <span id="round">1</span> · BEST <span id="best">0</span></div>
+  </section>
+
+  <!-- RESULT / RUN OVER SCREEN -->
+  <section class="screen result" id="result">
+    <div class="burst" id="burst">💥</div>
+    <div class="eyebrow" id="resultTag">WRONG ANSWER</div>
+    <h2 id="resultTitle">MISSED!</h2>
+    <p id="resultText">You missed the odd word out.</p>
+    <div><span class="timing-badge hidden" id="timingBadge">0.4s left</span></div>
+
+    <!-- Explanation Card -->
+    <div class="explanation-card" id="explanationCard">
+      <div class="explanation-head">
+        <span id="explainCategory">CATEGORY</span>
+        <span class="explanation-intruder" id="explainIntruder">ANSWER: —</span>
+      </div>
+      <div class="explanation-body" id="explainText">Explanation appears here.</div>
+      <div class="explanation-valid" id="explainValid">Matching words: —</div>
+    </div>
+
+    <div class="card scorebox">
+      <div><b id="finalScore">0</b><span>STREAK</span></div>
+      <div><b id="finalBest">0</b><span>BEST STREAK</span></div>
+      <div><b id="finalCoins">+0</b><span>SPARKS EARNED</span></div>
+    </div>
+
+    <div class="result-actions">
+      <!-- REVIVE REWARDED AD BUTTON -->
+      <button class="revive-btn" id="reviveAdBtn" onclick="app.triggerRewardedAd('revive')" type="button">
+        <span class="revive-icon">❤️‍🔥</span>
+        <div class="revive-text-group">
+          <b class="revive-title">REVIVE &amp; CONTINUE</b>
+          <span class="revive-sub" id="reviveStreakLabel">Keep your streak · +3s Breather</span>
+        </div>
+        <span class="revive-chip">📺 AD</span>
+      </button>
+
+      <button class="primary" id="replayBtn" onclick="app.replayCurrentMode()">PLAY AGAIN</button>
+      <div class="mode-row">
+        <button class="secondary" onclick="app.openShareModal()">📤 SHARE SCORE</button>
+        <button class="secondary" onclick="app.showScreen('home')">HOME</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- SHARE CARD & CHALLENGE LINK MODAL -->
+<div class="interstitial" id="shareOverlay" role="dialog" aria-modal="true" aria-labelledby="shareTitle" onclick="if(event.target===this)app.closeShareModal()">
+  <div class="card ad-modal">
+    <div class="modal-top">
+      <div class="ad-label">CHALLENGE A FRIEND</div>
+      <button class="icon-btn modal-close-x" onclick="app.closeShareModal()" aria-label="Close Share Modal">✕</button>
+    </div>
+    <h3 id="shareTitle">CHALLENGE A FRIEND</h3>
+    <p>Send your score to friends and see if they can beat it on the exact same words.</p>
+    <div class="share-preview" id="sharePreviewBox"></div>
+    <button class="primary" id="copyShareBtn" onclick="app.copyShareCard()">📋 COPY CHALLENGE LINK</button>
+    <button class="secondary" onclick="app.closeShareModal()">CLOSE</button>
+  </div>
+</div>
+
+<!-- SETTINGS & PAUSE MODAL -->
+<div class="interstitial" id="settingsOverlay" role="dialog" aria-modal="true" aria-labelledby="settingsTitle" onclick="if(event.target===this)app.closeSettings()">
+  <div class="card ad-modal settings-modal">
+    <div class="modal-top">
+      <div class="ad-label" id="settingsEyebrow">PREFERENCES</div>
+      <button class="icon-btn modal-close-x" onclick="app.closeSettings()" aria-label="Close Settings">✕</button>
+    </div>
+    <h3 id="settingsTitle">SETTINGS</h3>
+
+    <div class="pause-banner hidden" id="pauseBannerRow">
+      <span>⏸️ <b>Game Paused</b> · Your score is saved</span>
+      <button class="pack-bar-btn danger-text" onclick="app.quitActiveRun()">QUIT</button>
+    </div>
+
+    <div class="settings-scroll">
+      <div class="setting-row">
+        <div>
+          <b>Sound Effects</b>
+          <span>Tap sounds, timer ticks, and victory chimes</span>
+        </div>
+        <button class="toggle-btn on" id="toggleSound" onclick="app.toggleSetting('sound')">ON</button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <b>Vibration</b>
+          <span>Vibrate on button taps and timer alerts</span>
+        </div>
+        <button class="toggle-btn on" id="toggleHaptics" onclick="app.toggleSetting('haptics')">ON</button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <b>Reduced Motion</b>
+          <span>Disable screen shakes and pulse effects</span>
+        </div>
+        <button class="toggle-btn" id="toggleMotion" onclick="app.toggleSetting('reducedMotion')">OFF</button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <b>Timer Speed</b>
+          <span id="paceSettingSub">Starts at 12s, gets faster as your streak grows</span>
+        </div>
+        <button class="toggle-btn on" id="togglePace" onclick="app.cycleTimerPace()">PROGRESSIVE</button>
+      </div>
+
+      <div class="setting-row">
+        <div>
+          <b>18+ Adult Topics</b>
+          <span>Include nightlife, dating, and adult humor prompts</span>
+        </div>
+        <button class="toggle-btn" id="toggleAdult" onclick="app.cycleAdultMode()">OFF</button>
+      </div>
+
+      <div class="setting-row" id="installAppRow">
+        <div>
+          <b>Install to Phone</b>
+          <span id="installAppSub">Add to your home screen for quick offline play</span>
+        </div>
+        <button class="toggle-btn on" onclick="app.promptInstall()">INSTALL</button>
+      </div>
+
+      <details class="telemetry-details">
+        <summary>📊 Game Stats</summary>
+        <div class="telemetry-box" id="telemetryBox"></div>
+      </details>
+    </div>
+
+    <div class="mode-row settings-footer">
+      <button class="secondary" onclick="app.resetProgress()">RESET DATA</button>
+      <button class="primary" id="settingsDoneBtn" style="padding:13px" onclick="app.closeSettings()">DONE</button>
+    </div>
+  </div>
+</div>
+
+<!-- 18+ AGE GATE MODAL -->
+<div class="interstitial" id="ageGateOverlay" role="dialog" aria-modal="true" aria-labelledby="ageGateTitle">
+  <div class="card ad-modal">
+    <div class="ad-label" style="color:var(--pink)">🔥 18+ CONTENT</div>
+    <h3 id="ageGateTitle">ENABLE 18+ TOPICS?</h3>
+    <p>This includes mature prompts covering nightlife, dating, and adult humor. Please confirm you are at least 18 years old to proceed.</p>
+    <button class="primary" onclick="app.confirmAgeGate()">I AM 18+ — CONTINUE</button>
+    <button class="secondary" onclick="app.closeAgeGate()">CANCEL</button>
+  </div>
+</div>
+
+<!-- SELECT ALL TOPICS MODAL -->
+<div class="interstitial" id="selectAllModal" role="dialog" aria-modal="true" aria-labelledby="selectAllTitle">
+  <div class="card ad-modal">
+    <div class="ad-label" style="color:var(--pink)">SELECT ALL PROMPTS</div>
+    <h3 id="selectAllTitle">INCLUDE 18+ TOPICS?</h3>
+    <p>Would you like to include 18+ mature topics (dating, nightlife, adult humor) in your active game pool?</p>
+    <button class="primary" onclick="app.confirmSelectAll(true)" style="background:var(--pink); border-color:var(--pink); margin-bottom:8px;">
+      YES, INCLUDE 18+ 🔥
+    </button>
+    <button class="secondary" onclick="app.confirmSelectAll(false)" style="margin-bottom:8px;">
+      NO, STANDARD ONLY
+    </button>
+    <button class="pack-bar-btn" onclick="app.closeSelectAllModal()" style="align-self:center; font-size:12px; opacity:0.75; margin-top:4px;">
+      CANCEL
+    </button>
+  </div>
+</div>
+
+<!-- REWARDED AD SIMULATION MODAL -->
+<div class="interstitial" id="rewardedAdModal" role="dialog" aria-modal="true" aria-labelledby="rewardedAdTitle" onclick="if(event.target===this)app.cancelRewardedAd()">
+  <div class="card ad-modal rewarded-modal">
+    <div class="modal-top">
+      <div class="ad-label" id="rewardedAdCategory">⚡ 2X SPARKS REWARD</div>
+      <button class="icon-btn modal-close-x" id="rewardedAdCloseBtn" onclick="app.cancelRewardedAd()" aria-label="Skip or close ad">✕</button>
+    </div>
+    <h3 id="rewardedAdTitle">SPONSORED VIDEO</h3>
+    <p id="rewardedAdSubtitle">Complete the video to claim your reward.</p>
+
+    <div class="ad-sim-canvas" id="adSimCanvas">
+      <div class="ad-sim-brand">ODD ONE OUT</div>
+      <div class="ad-sim-tagline">13 Topic Packs · Over 1,200 Prompts</div>
+      <div class="ad-sim-timer" id="adSimTimer">5s</div>
+      <div class="ad-progress-bar">
+        <div class="ad-progress-fill" id="adProgressFill"></div>
+      </div>
+    </div>
+
+    <div class="ad-modal-footer">
+      <span class="ad-status-note" id="adStatusNote">Reward unlocks in 5s...</span>
+      <button class="primary hidden" id="claimRewardBtn" onclick="app.claimActiveReward()">CLAIM REWARD ✨</button>
+    </div>
+  </div>
+</div>
+
+<script src="./js/packs-data.js"></script>
+<script src="./js/audio.js"></script>
+<script src="./js/analytics.js"></script>
+<script src="./js/app.js"></script>
+</body>
+</html>
