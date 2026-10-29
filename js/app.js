@@ -4,9 +4,10 @@
  */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const APP_VERSION = '1.3.7';
+  const APP_VERSION = '1.3.9';
+  const ADS_TEST_MODE = true; // Set to true for guaranteed Google test ads; false for live store ads
   const SAVE_KEY = 'oneshot_save_v1';
-  console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
+  console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED (ADS_TEST_MODE=${ADS_TEST_MODE})`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
 
   const STANDARD_PACKS = [
     'General Knowledge',
@@ -174,6 +175,7 @@
       this.pendingAdAction = null;
       this.pendingAdultCallback = null;
       this.adInterval = null;
+      this.isAdLoading = false;
       this.shopTab = 'packs';
       this.deferredInstallPrompt = null;
 
@@ -1884,41 +1886,80 @@
       if (window.oneShotAudio) window.oneShotAudio.playTap();
       this.pendingAdAction = type;
 
+      const isNative = typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+
       // Check for native Capacitor AdMob plugin
-      if (window.Capacitor?.Plugins?.AdMob) {
+      if (isNative && window.Capacitor?.Plugins?.AdMob) {
         this.showNativeCapacitorRewardedAd(type);
         return;
       }
 
-      // Check for Google H5 Games Ads / Web AdBreak
+      // Check for Google H5 Games Ads / Web AdBreak (browser)
       if (window.adBreak || window.showAds) {
         this.showWebRewardedAd(type);
         return;
       }
 
-      // Interactive rewarded ad modal (Simulator, Browser, itch.io)
-      this.openRewardedAdModal(type);
+      // Interactive rewarded ad modal ONLY when NOT running natively
+      if (!isNative) {
+        this.openRewardedAdModal(type);
+      } else {
+        this.showFloatingBurst('Ads temporarily unavailable');
+        this.cancelRewardedAd();
+      }
     }
 
     async showNativeCapacitorRewardedAd(type) {
-      try {
-        const AdMob = window.Capacitor?.Plugins?.AdMob;
-        if (!AdMob) {
-          this.openRewardedAdModal(type);
-          return;
-        }
+      console.log('[AdMob] showNativeCapacitorRewardedAd called, type:', type, 'testMode:', ADS_TEST_MODE);
+      const isNative = typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
 
-        // Initialize AdMob once
+      if (this.isAdLoading) {
+        console.log('[AdMob] Ad is already loading, ignoring concurrent request');
+        this.showFloatingBurst('Loading ad...');
+        return;
+      }
+
+      const AdMob = window.Capacitor?.Plugins?.AdMob;
+      if (!AdMob) {
+        console.warn('[AdMob] Plugin not available on window.Capacitor.Plugins');
+        if (!isNative) {
+          this.openRewardedAdModal(type);
+        } else {
+          this.showFloatingBurst('Ad service unavailable');
+          this.cancelRewardedAd();
+        }
+        return;
+      }
+
+      this.isAdLoading = true;
+      let listeners = [];
+      const cleanup = () => {
+        listeners.forEach((l) => {
+          try { if (l && typeof l.remove === 'function') l.remove(); } catch (_) {}
+        });
+        listeners = [];
+      };
+
+      try {
+        // Initialize AdMob once with testing mode flag tied to ADS_TEST_MODE
         if (!this.admobInitialized) {
-          await AdMob.initialize().catch((e) => console.warn('[AdMob] init warn:', e));
+          console.log(`[AdMob] Initializing AdMob plugin with initializeForTesting: ${ADS_TEST_MODE}...`);
+          await AdMob.initialize({
+            initializeForTesting: ADS_TEST_MODE,
+          }).catch((e) => console.warn('[AdMob] initialize warning:', e));
           this.admobInitialized = true;
         }
 
         const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'android';
-        // Platform-specific Live Rewarded Ad Unit IDs:
-        const adUnitId = platform === 'ios'
-          ? 'ca-app-pub-2691430114035059/5689531599'  // Live iOS Rewarded Ad Unit ID
-          : 'ca-app-pub-2691430114035059/1849524787'; // Live Android Rewarded Ad Unit ID
+        // When ADS_TEST_MODE is true, use ONLY Google's official test ad unit IDs
+        // When false, use ONLY the live unit IDs. Never request both in the same flow.
+        const adUnitId = ADS_TEST_MODE
+          ? (platform === 'ios'
+              ? 'ca-app-pub-3940256099942544/1712485313'  // Official Google iOS Test Rewarded Ad Unit ID
+              : 'ca-app-pub-3940256099942544/5224354917') // Official Google Android Test Rewarded Ad Unit ID
+          : (platform === 'ios'
+              ? 'ca-app-pub-2691430114035059/5689531599'  // Live iOS Rewarded Ad Unit ID
+              : 'ca-app-pub-2691430114035059/1849524787'); // Live Android Rewarded Ad Unit ID
 
         const RewardedEvent = window.RewardAdPluginEvents?.Rewarded || 'onRewardedVideoAdReward';
         const DismissedEvent = window.RewardAdPluginEvents?.Dismissed || 'onRewardedVideoAdDismissed';
@@ -1926,45 +1967,45 @@
         const FailedToShowEvent = window.RewardAdPluginEvents?.FailedToShow || 'onRewardedVideoAdFailedToShow';
 
         let rewardEarned = false;
-        let adClosed = false;
 
-        const cleanup = () => {
-          try {
-            if (rewardListener?.remove) rewardListener.remove();
-            if (dismissListener?.remove) dismissListener.remove();
-            if (failLoadListener?.remove) failLoadListener.remove();
-            if (failShowListener?.remove) failShowListener.remove();
-          } catch (_) {}
-        };
-
-        const rewardListener = await AdMob.addListener(RewardedEvent, () => {
+        const rewardListener = await AdMob.addListener(RewardedEvent, (rewardItem) => {
+          console.log('[AdMob] Rewarded event received:', rewardItem);
           rewardEarned = true;
           this.grantAdReward(type);
         }).catch(() => null);
+        if (rewardListener) listeners.push(rewardListener);
 
         const dismissListener = await AdMob.addListener(DismissedEvent, () => {
-          adClosed = true;
+          console.log('[AdMob] Dismissed event received');
           cleanup();
-          if (!rewardEarned) this.cancelRewardedAd();
+          if (!rewardEarned) {
+            this.cancelRewardedAd();
+          }
         }).catch(() => null);
-
-        const failLoadListener = await AdMob.addListener(FailedToLoadEvent, (err) => {
-          console.warn('[AdMob] FailedToLoad:', err);
-          cleanup();
-          if (!rewardEarned && !adClosed) this.openRewardedAdModal(type);
-        }).catch(() => null);
+        if (dismissListener) listeners.push(dismissListener);
 
         const failShowListener = await AdMob.addListener(FailedToShowEvent, (err) => {
           console.warn('[AdMob] FailedToShow:', err);
           cleanup();
-          if (!rewardEarned && !adClosed) this.openRewardedAdModal(type);
+          if (!rewardEarned) {
+            this.showFloatingBurst('Ad presentation failed');
+            this.cancelRewardedAd();
+          }
         }).catch(() => null);
+        if (failShowListener) listeners.push(failShowListener);
 
-        await AdMob.prepareRewardVideoAd({ adId: adUnitId });
+        console.log(`[AdMob] Preparing rewarded video (adId: ${adUnitId}, isTesting: ${ADS_TEST_MODE})...`);
+        await AdMob.prepareRewardVideoAd({ adId: adUnitId, isTesting: ADS_TEST_MODE });
+
+        console.log('[AdMob] Ad prepared successfully, showing reward video...');
         await AdMob.showRewardVideoAd();
       } catch (err) {
-        console.warn('Native AdMob video failed, falling back to simulated modal:', err);
-        this.openRewardedAdModal(type);
+        console.error('[AdMob] Native ad load/show failed (error code/message):', err);
+        cleanup();
+        this.showFloatingBurst('Ad unavailable · Please try again later');
+        this.cancelRewardedAd();
+      } finally {
+        this.isAdLoading = false;
       }
     }
 
@@ -1973,38 +2014,38 @@
       try {
         if (typeof window.adBreak === 'function') {
           let adHandled = false;
-          // Snappy 900ms safety watchdog: if AdSense is blocked by AdBlock or fails to load, fallback to simulated modal immediately
+          // Watchdog: Give Google AdSense ample time (4500ms) to load its test ad iframe from Google servers
           const safetyTimer = setTimeout(() => {
             console.log('[Ad] safetyTimer fired, adHandled:', adHandled);
             if (!adHandled) {
               adHandled = true;
               this.openRewardedAdModal(type);
             }
-          }, 900);
+          }, 4500);
 
           window.adBreak({
             type: 'reward',
             name: type,
             beforeReward: (showAdFn) => {
-              console.log('[Ad] beforeReward called');
+              console.log('[Ad] beforeReward called by Google');
               adHandled = true;
               clearTimeout(safetyTimer);
               showAdFn();
             },
             adDismissed: () => {
-              console.log('[Ad] adDismissed called');
+              console.log('[Ad] adDismissed called by Google');
               adHandled = true;
               clearTimeout(safetyTimer);
               this.cancelRewardedAd();
             },
             adViewed: () => {
-              console.log('[Ad] adViewed called');
+              console.log('[Ad] adViewed called by Google');
               adHandled = true;
               clearTimeout(safetyTimer);
               this.grantAdReward(type);
             },
             adBreakDone: (info) => {
-              console.log('[Ad] adBreakDone called, info:', JSON.stringify(info));
+              console.log('[Ad] adBreakDone called by Google, info:', JSON.stringify(info));
               clearTimeout(safetyTimer);
               if (!adHandled) {
                 adHandled = true;
@@ -2024,6 +2065,13 @@
 
     openRewardedAdModal(type) {
       console.log('[Ad] openRewardedAdModal called, type:', type);
+      const isNative = typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+      if (isNative) {
+        console.warn('[Ad] Refusing to open simulated ad modal on native platform');
+        this.showFloatingBurst('Ad unavailable');
+        this.cancelRewardedAd();
+        return;
+      }
       const overlay = document.getElementById('rewardedAdModal');
       console.log('[Ad] overlay element exists:', !!overlay);
       if (!overlay) {
@@ -2587,45 +2635,8 @@
     }
 
     buildShareCardText() {
-      const badge = this.state.equippedBadge || '⚡';
-      const today = getTodayKey();
-      const isDailyForToday = this.mode === 'daily' && (this.state.daily.lastPlayedDate === today || this.state.daily.lastCompletedDate === today);
-      const history =
-        isDailyForToday && this.roundHistory.length === 0
-          ? this.state.daily.todayHistory || []
-          : this.roundHistory;
-
-      const emojiTokens = history.map((h) => {
-        if (!h.ok) return h.timeout ? '⌛' : '💥';
-        return h.timeLeft <= 1.2 ? '🔥' : '🟩';
-      });
-      const emojiRows = [];
-      for (let i = 0; i < emojiTokens.length; i += 10) {
-        emojiRows.push(emojiTokens.slice(i, i + 10).join(''));
-      }
-      const emojiBar = emojiRows.join('\n');
-
-      const baseUrl = window.location.origin + window.location.pathname;
-      const seed = this.lastRunSeed || 'SHOT26';
-      const targetStreak = Math.max(1, this.streak);
-      const duelUrl = `${baseUrl}?duel=${seed}-${targetStreak}`;
-
-      if (this.mode === 'daily') {
-        return [
-          `${badge} ODD ONE OUT · DAILY CHALLENGE (${today})`,
-          `Score: ${this.state.daily.todayScore || this.streak}/5 · Streak: ${this.state.daily.streak || 1}🔥`,
-          emojiBar || '🟩🟩🟩🟩🟩',
-          `Play today's challenge: ${baseUrl}?mode=daily`
-        ].join('\n');
-      }
-
-      const modeTag = this.state.adultMode !== 'off' ? ' · 18+' : '';
-      return [
-        `${badge} ODD ONE OUT${modeTag} · STREAK ${this.streak} 🔥 (Best: ${this.state.bestStreak})`,
-        emojiBar || '💥',
-        `Can you beat my streak of ${targetStreak}?`,
-        duelUrl
-      ].join('\n');
+      const appUrl = 'https://techbishop.github.io/oddoneout/';
+      return `Play Odd One Out — Fast mobile word game! Spot the connection and find the odd word out: ${appUrl}`;
     }
 
     openShareModal() {
@@ -2637,10 +2648,11 @@
         });
       }
 
+      const appUrl = 'https://techbishop.github.io/oddoneout/';
       const preview = document.getElementById('sharePreviewBox');
-      if (preview) preview.textContent = this.buildShareCardText();
+      if (preview) preview.textContent = appUrl;
       const copyBtn = document.getElementById('copyShareBtn');
-      if (copyBtn) copyBtn.textContent = '📋 COPY CHALLENGE LINK';
+      if (copyBtn) copyBtn.textContent = '🔗 SHARE APP LINK';
 
       const modal = document.getElementById('shareOverlay');
       if (modal) modal.classList.add('show');
@@ -2652,26 +2664,30 @@
     }
 
     async copyShareCard() {
-      const text = this.buildShareCardText();
+      const appUrl = 'https://techbishop.github.io/oddoneout/';
       const copyBtn = document.getElementById('copyShareBtn');
 
       try {
         if (navigator.share) {
           await navigator.share({
             title: 'Odd One Out — Fast Word Game',
-            text
+            text: 'Play Odd One Out — Spot the connection and find the odd one out!',
+            url: appUrl
           });
           if (copyBtn) copyBtn.textContent = 'SHARED ✓';
+          this.showFloatingBurst('App link shared! ⚡');
           return;
         }
-      } catch (_) {}
+      } catch (err) {
+        if (err && err.name !== 'AbortError') console.warn('Share error:', err);
+      }
 
       try {
-        await navigator.clipboard.writeText(text);
+        await navigator.clipboard.writeText(appUrl);
         if (copyBtn) copyBtn.textContent = 'COPIED TO CLIPBOARD ✓';
-        this.showFloatingBurst('Challenge link copied to clipboard!');
+        this.showFloatingBurst('App link copied to clipboard! 📋');
       } catch (_) {
-        if (copyBtn) copyBtn.textContent = 'SELECT & COPY ABOVE';
+        this.openShareModal();
       }
     }
 

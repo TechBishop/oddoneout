@@ -11,8 +11,8 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <title>Odd One Out v1.3.7 — Fast Word Game</title>
-  <link rel="stylesheet" href="./styles.css?v=1.3.7">
+  <title>Odd One Out v1.3.9 — Fast Word Game</title>
+  <link rel="stylesheet" href="./styles.css?v=1.3.9">
 
   <!-- GOOGLE ADSENSE (H5 GAMES ADS API) -->
   <script async
@@ -163,7 +163,7 @@
 
     <!-- 6. VERSION STAMP -->
     <div class="home-bottom-wrap">
-      <div class="home-version-tag" id="homeVersionTag">ODD ONE OUT · v1.3.7</div>
+      <div class="home-version-tag" id="homeVersionTag">ODD ONE OUT · v1.3.9</div>
     </div>
   </section>
 
@@ -196,7 +196,7 @@
 
     <button class="primary" onclick="app.startQuickShot()">START PLAYING</button>
     <button class="secondary" onclick="app.showScreen('home')">BACK</button>
-    <div class="howto-version-tag">ODD ONE OUT · v1.3.7</div>
+    <div class="howto-version-tag">ODD ONE OUT · v1.3.9</div>
   </section>
 
   <!-- SHOP & PACKS SCREEN -->
@@ -288,24 +288,24 @@
 
       <button class="primary" id="replayBtn" onclick="app.replayCurrentMode()">PLAY AGAIN</button>
       <div class="mode-row">
-        <button class="secondary" onclick="app.openShareModal()">📤 SHARE SCORE</button>
+        <button class="secondary" onclick="app.copyShareCard()">🔗 SHARE APP</button>
         <button class="secondary" onclick="app.showScreen('home')">HOME</button>
       </div>
     </div>
   </section>
 </main>
 
-<!-- SHARE CARD & CHALLENGE LINK MODAL -->
+<!-- SHARE APP LINK MODAL -->
 <div class="interstitial" id="shareOverlay" role="dialog" aria-modal="true" aria-labelledby="shareTitle" onclick="if(event.target===this)app.closeShareModal()">
   <div class="card ad-modal">
     <div class="modal-top">
-      <div class="ad-label">CHALLENGE A FRIEND</div>
+      <div class="ad-label">SHARE APP</div>
       <button class="icon-btn modal-close-x" onclick="app.closeShareModal()" aria-label="Close Share Modal">✕</button>
     </div>
-    <h3 id="shareTitle">CHALLENGE A FRIEND</h3>
-    <p>Send your score to friends and see if they can beat it on the exact same words.</p>
-    <div class="share-preview" id="sharePreviewBox"></div>
-    <button class="primary" id="copyShareBtn" onclick="app.copyShareCard()">📋 COPY CHALLENGE LINK</button>
+    <h3 id="shareTitle">SHARE ODD ONE OUT</h3>
+    <p>Share the game link with friends!</p>
+    <div class="share-preview" id="sharePreviewBox">https://techbishop.github.io/oddoneout/</div>
+    <button class="primary" id="copyShareBtn" onclick="app.copyShareCard()">🔗 SHARE APP LINK</button>
     <button class="secondary" onclick="app.closeShareModal()">CLOSE</button>
   </div>
 </div>
@@ -365,14 +365,6 @@
         <button class="toggle-btn" id="toggleAdult" onclick="app.cycleAdultMode()">OFF</button>
       </div>
 
-      <div class="setting-row" id="installAppRow">
-        <div>
-          <b>Install to Phone</b>
-          <span id="installAppSub">Add to your home screen for quick offline play</span>
-        </div>
-        <button class="toggle-btn on" onclick="app.promptInstall()">INSTALL</button>
-      </div>
-
       <details class="telemetry-details">
         <summary>📊 Game Stats</summary>
         <div class="telemetry-box" id="telemetryBox"></div>
@@ -383,7 +375,7 @@
       <button class="secondary" onclick="app.resetProgress()">RESET DATA</button>
       <button class="primary" id="settingsDoneBtn" style="padding:13px" onclick="app.closeSettings()">DONE</button>
     </div>
-    <div class="settings-version-tag">ODD ONE OUT · v1.3.7</div>
+    <div class="settings-version-tag">ODD ONE OUT · v1.3.9</div>
   </div>
 </div>
 
@@ -444,10 +436,10 @@
 
 <canvas id="fxCanvas" class="fx-canvas"></canvas>
 
-<script src="./js/packs-data.js?v=1.3.7"></script>
-<script src="./js/fx.js?v=1.3.7"></script>
-<script src="./js/audio.js?v=1.3.7"></script>
-<script src="./js/analytics.js?v=1.3.7"></script>
-<script src="./js/app.js?v=1.3.7"></script>
+<script src="./js/packs-data.js?v=1.3.9"></script>
+<script src="./js/fx.js?v=1.3.9"></script>
+<script src="./js/audio.js?v=1.3.9"></script>
+<script src="./js/analytics.js?v=1.3.9"></script>
+<script src="./js/app.js?v=1.3.9"></script>
 </body>
 </html>

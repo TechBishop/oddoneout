@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oddoneout-v1.3.7';
+const CACHE_NAME = 'oddoneout-v1.3.9';
 const CORE_ASSETS = [
   './',
   './index.html',
