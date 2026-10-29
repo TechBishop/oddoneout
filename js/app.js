@@ -4,7 +4,7 @@
  */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const APP_VERSION = '1.3.6';
+  const APP_VERSION = '1.3.7';
   const SAVE_KEY = 'oneshot_save_v1';
   console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
 
@@ -199,9 +199,11 @@
         packPreviewName: null,
         nextRound2xBoost: false,
         daily: {
+          lastPlayedDate: null,
           lastCompletedDate: null,
           streak: 0,
           todayScore: 0,
+          todayCompleted: false,
           todayHistory: []
         },
         settings: {
@@ -531,12 +533,13 @@
       }
 
       const today = getTodayKey();
+      const playedToday = this.state.daily.lastPlayedDate === today || this.state.daily.lastCompletedDate === today;
       const completedToday = this.state.daily.lastCompletedDate === today;
       if ($('dailyDot')) {
-        $('dailyDot').style.display = completedToday ? 'none' : 'inline-block';
+        $('dailyDot').style.display = playedToday ? 'none' : 'inline-block';
       }
       if ($('dailyBtnLabel')) {
-        $('dailyBtnLabel').textContent = completedToday ? '✅ DAILY' : '🎯 DAILY';
+        $('dailyBtnLabel').textContent = completedToday ? '✅ DAILY (✓)' : playedToday ? '🎯 DAILY (PLAYED)' : '🎯 DAILY';
       }
 
       // Sync Timer Pace descriptions on Home & How-To
@@ -891,8 +894,15 @@
 
     startDailyTarget() {
       const today = getTodayKey();
-      if (this.state.daily.lastCompletedDate === today) {
+      const alreadyPlayed = this.state.daily.lastPlayedDate === today || this.state.daily.lastCompletedDate === today;
+      if (alreadyPlayed) {
         this.mode = 'daily';
+        if (window.oneShotAudio) window.oneShotAudio.playTap();
+        const score = this.state.daily.todayScore || 0;
+        const msg = this.state.daily.todayCompleted
+          ? `🎯 Today's Daily already completed (5/5)! Resets at midnight.`
+          : `🎯 Today's Daily already played (${score}/5)! Next challenge at midnight.`;
+        this.showFloatingBurst(msg);
         this.openShareModal();
         return;
       }
@@ -908,6 +918,14 @@
       this.doubleUsedThisResult = false;
       this.newBestAwardedThisRun = false;
       this.roundHistory = [];
+
+      // Mark daily as played today immediately upon launch so it cannot be farmed or replayed today
+      this.state.daily.lastPlayedDate = today;
+      this.state.daily.todayScore = 0;
+      this.state.daily.todayCompleted = false;
+      this.state.daily.todayHistory = [];
+      this.saveState();
+      this.syncHeaderAndHome();
 
       // Daily Challenge is always a timed challenge (12s) - consume 2X sparks boost if active
       if (this.state.nextRound2xBoost) {
@@ -1686,10 +1704,13 @@
       } else if (this.state.daily.lastCompletedDate !== today) {
         this.state.daily.streak = 1;
       }
+      this.state.daily.lastPlayedDate = today;
       this.state.daily.lastCompletedDate = today;
-      this.state.daily.todayScore = this.streak;
+      this.state.daily.todayScore = 5;
+      this.state.daily.todayCompleted = true;
       this.state.daily.todayHistory = [...this.roundHistory];
       this.saveState();
+      this.syncHeaderAndHome();
 
       if (window.oneShotAudio) window.oneShotAudio.playMilestone(10);
       if (window.oneShotFX) window.oneShotFX.confettiShower(85);
@@ -1709,6 +1730,19 @@
       this.hideRelationReveal();
       this.answered = true;
       this.state.completedRuns = (this.state.completedRuns || 0) + 1;
+
+      const today = getTodayKey();
+      if (this.mode === 'daily') {
+        this.state.daily.lastPlayedDate = today;
+        this.state.daily.todayScore = this.streak;
+        this.state.daily.todayHistory = [...this.roundHistory];
+        if (!completedDaily) {
+          this.state.daily.todayCompleted = false;
+          this.state.daily.streak = 0; // Missed daily drops current daily streak
+        }
+        this.syncHeaderAndHome();
+      }
+
       this.saveState();
 
       if (window.oneShotAnalytics) {
@@ -1728,6 +1762,11 @@
         $('resultTag').textContent = `DAILY CHALLENGE COMPLETE · ${this.state.daily.streak}🔥 DAY STREAK`;
         $('resultTitle').textContent = 'PERFECT 5/5!';
         $('resultText').textContent = `You completed today’s challenge and earned a +30 ⚡ bonus!`;
+      } else if (this.mode === 'daily') {
+        $('burst').textContent = isTimeout ? '⏰' : '❌';
+        $('resultTag').textContent = `DAILY CHALLENGE · ${this.streak}/5 COMPLETED`;
+        $('resultTitle').textContent = isTimeout ? 'TIME UP!' : 'MISSED!';
+        $('resultText').textContent = `You completed ${this.streak}/5 daily prompts today. New daily unlocks at midnight!`;
       } else if (this.mode === 'duel' && this.streak > this.duelTarget) {
         $('burst').textContent = '⚔️';
         $('resultTag').textContent = 'CHALLENGE COMPLETE';
@@ -1801,7 +1840,7 @@
       }
 
       if ($('replayBtn')) {
-        $('replayBtn').textContent = 'PLAY AGAIN';
+        $('replayBtn').textContent = this.mode === 'daily' ? 'PLAY QUICK SHOT' : 'PLAY AGAIN';
       }
 
       this.showScreen('result');
@@ -1863,7 +1902,7 @@
 
     async showNativeCapacitorRewardedAd(type) {
       try {
-        const { AdMob, RewardAdPluginEvents } = window.Capacitor.Plugins;
+        const AdMob = window.Capacitor?.Plugins?.AdMob;
         if (!AdMob) {
           this.openRewardedAdModal(type);
           return;
@@ -1871,27 +1910,55 @@
 
         // Initialize AdMob once
         if (!this.admobInitialized) {
-          await AdMob.initialize();
+          await AdMob.initialize().catch((e) => console.warn('[AdMob] init warn:', e));
           this.admobInitialized = true;
         }
 
         const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'android';
         // Platform-specific Live Rewarded Ad Unit IDs:
         const adUnitId = platform === 'ios'
-          ? 'ca-app-pub-2691430114035059/5689531599'  // Your live iOS Rewarded Ad Unit ID
-          : 'ca-app-pub-2691430114035059/1849524787'; // Your live Android Rewarded Ad Unit ID
+          ? 'ca-app-pub-2691430114035059/5689531599'  // Live iOS Rewarded Ad Unit ID
+          : 'ca-app-pub-2691430114035059/1849524787'; // Live Android Rewarded Ad Unit ID
+
+        const RewardedEvent = window.RewardAdPluginEvents?.Rewarded || 'onRewardedVideoAdReward';
+        const DismissedEvent = window.RewardAdPluginEvents?.Dismissed || 'onRewardedVideoAdDismissed';
+        const FailedToLoadEvent = window.RewardAdPluginEvents?.FailedToLoad || 'onRewardedVideoAdFailedToLoad';
+        const FailedToShowEvent = window.RewardAdPluginEvents?.FailedToShow || 'onRewardedVideoAdFailedToShow';
 
         let rewardEarned = false;
-        const rewardListener = await AdMob.addListener(RewardAdPluginEvents.Rewarded, () => {
+        let adClosed = false;
+
+        const cleanup = () => {
+          try {
+            if (rewardListener?.remove) rewardListener.remove();
+            if (dismissListener?.remove) dismissListener.remove();
+            if (failLoadListener?.remove) failLoadListener.remove();
+            if (failShowListener?.remove) failShowListener.remove();
+          } catch (_) {}
+        };
+
+        const rewardListener = await AdMob.addListener(RewardedEvent, () => {
           rewardEarned = true;
           this.grantAdReward(type);
-        });
+        }).catch(() => null);
 
-        const dismissListener = await AdMob.addListener(RewardAdPluginEvents.Dismissed, () => {
+        const dismissListener = await AdMob.addListener(DismissedEvent, () => {
+          adClosed = true;
+          cleanup();
           if (!rewardEarned) this.cancelRewardedAd();
-          if (rewardListener && rewardListener.remove) rewardListener.remove();
-          if (dismissListener && dismissListener.remove) dismissListener.remove();
-        });
+        }).catch(() => null);
+
+        const failLoadListener = await AdMob.addListener(FailedToLoadEvent, (err) => {
+          console.warn('[AdMob] FailedToLoad:', err);
+          cleanup();
+          if (!rewardEarned && !adClosed) this.openRewardedAdModal(type);
+        }).catch(() => null);
+
+        const failShowListener = await AdMob.addListener(FailedToShowEvent, (err) => {
+          console.warn('[AdMob] FailedToShow:', err);
+          cleanup();
+          if (!rewardEarned && !adClosed) this.openRewardedAdModal(type);
+        }).catch(() => null);
 
         await AdMob.prepareRewardVideoAd({ adId: adUnitId });
         await AdMob.showRewardVideoAd();
@@ -2522,8 +2589,9 @@
     buildShareCardText() {
       const badge = this.state.equippedBadge || '⚡';
       const today = getTodayKey();
+      const isDailyForToday = this.mode === 'daily' && (this.state.daily.lastPlayedDate === today || this.state.daily.lastCompletedDate === today);
       const history =
-        this.mode === 'daily' && this.state.daily.lastCompletedDate === today && this.roundHistory.length === 0
+        isDailyForToday && this.roundHistory.length === 0
           ? this.state.daily.todayHistory || []
           : this.roundHistory;
 
