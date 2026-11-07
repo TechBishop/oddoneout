@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oddoneout-v1.3.9';
+const CACHE_NAME = 'oddoneout-v1.3.9-ads1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -10,6 +10,7 @@ const CORE_ASSETS = [
   './js/fx.js',
   './js/audio.js',
   './js/analytics.js',
+  './js/ads-policy.js',
   './js/app.js'
 ];
 

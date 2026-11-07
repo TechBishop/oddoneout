@@ -408,28 +408,18 @@
   </div>
 </div>
 
-<!-- REWARDED AD SIMULATION MODAL -->
+<!-- REWARDED AD STATUS. This is not an advertisement and never grants a reward by itself. -->
 <div class="interstitial" id="rewardedAdModal" role="dialog" aria-modal="true" aria-labelledby="rewardedAdTitle" onclick="if(event.target===this)app.cancelRewardedAd()">
   <div class="card ad-modal rewarded-modal">
     <div class="modal-top">
-      <div class="ad-label" id="rewardedAdCategory">⚡ 2X SPARKS REWARD</div>
-      <button class="icon-btn modal-close-x" id="rewardedAdCloseBtn" onclick="app.cancelRewardedAd()" aria-label="Skip or close ad">✕</button>
+      <div class="ad-label" id="rewardedAdCategory">2X SPARKS</div>
+      <button class="icon-btn modal-close-x" id="rewardedAdCloseBtn" onclick="app.cancelRewardedAd()" aria-label="Close and continue without a reward">✕</button>
     </div>
-    <h3 id="rewardedAdTitle">SPONSORED VIDEO</h3>
-    <p id="rewardedAdSubtitle">Complete the video to claim your reward.</p>
-
-    <div class="ad-sim-canvas" id="adSimCanvas">
-      <div class="ad-sim-brand">ODD ONE OUT</div>
-      <div class="ad-sim-tagline">13 Topic Packs · Over 1,200 Prompts</div>
-      <div class="ad-sim-timer" id="adSimTimer">5s</div>
-      <div class="ad-progress-bar">
-        <div class="ad-progress-fill" id="adProgressFill"></div>
-      </div>
-    </div>
-
+    <h3 id="rewardedAdTitle">Looking for an ad</h3>
+    <p id="rewardedAdSubtitle" role="status" aria-live="polite">If an ad is available, you can watch it. Nothing is granted until that ad is completed.</p>
     <div class="ad-modal-footer">
-      <span class="ad-status-note" id="adStatusNote">Reward unlocks in 5s...</span>
-      <button class="primary hidden" id="claimRewardBtn" onclick="app.claimActiveReward()">CLAIM REWARD ✨</button>
+      <button class="primary hidden" id="rewardedAdRetryBtn" type="button" onclick="app.retryRewardedAd()">TRY AGAIN</button>
+      <button class="secondary" id="rewardedAdDismissBtn" type="button" onclick="app.cancelRewardedAd()">CANCEL</button>
     </div>
   </div>
 </div>
@@ -440,6 +430,7 @@
 <script src="./js/fx.js?v=1.3.9"></script>
 <script src="./js/audio.js?v=1.3.9"></script>
 <script src="./js/analytics.js?v=1.3.9"></script>
+<script src="./js/ads-policy.js?v=1.3.9"></script>
 <script src="./js/app.js?v=1.3.9"></script>
 </body>
 </html>
