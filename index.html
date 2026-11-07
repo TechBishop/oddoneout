@@ -36,16 +36,43 @@
 <main class="app">
   <div class="float-feedback" id="floatFeedback" aria-live="polite">+10 ⚡</div>
 
-  <!-- CENTER SPARK PLUS BUBBLE (Exact Middle of Screen — Non-Bulky Arcade Feedback) -->
-  <div class="win-feedback spark-bubble-overlay hidden" id="winFeedback" aria-live="assertive">
-    <div class="win-spark-pill spark-plus-bubble" id="winSparkPill">
-      <div class="spark-bubble-main">
-        <span class="win-spark-icon spark-bubble-icon" id="winSparkIcon">⚡</span>
-        <span class="win-spark-value spark-bubble-value" id="winSparkValue">+10</span>
-        <span class="win-spark-badge spark-bubble-badge" id="winSparkBadge"></span>
+  <!-- Correct-answer connection card. Spark total stays; the explanation holds for 2.5s. -->
+  <div class="win-feedback spark-bubble-overlay hidden" id="winFeedback" role="dialog" aria-modal="true" aria-label="Connection reveal" aria-live="assertive">
+    <div class="relation-card" id="relationReveal">
+      <div class="win-spark-pill spark-plus-bubble" id="winSparkPill">
+        <div class="spark-bubble-main">
+          <span class="win-spark-icon spark-bubble-icon" id="winSparkIcon">⚡</span>
+          <span class="win-spark-value spark-bubble-value" id="winSparkValue">+10</span>
+          <span class="win-spark-badge spark-bubble-badge" id="winSparkBadge"></span>
+        </div>
+        <div class="win-theme-row spark-bubble-theme-row">
+          <strong class="win-theme-name spark-bubble-theme" id="winThemeName">PRIMARY COLORS</strong>
+        </div>
       </div>
-      <div class="win-theme-row spark-bubble-theme-row">
-        <strong class="win-theme-name spark-bubble-theme" id="winThemeName">PRIMARY COLORS</strong>
+
+      <div class="relation-badge">
+        <span class="relation-icon" aria-hidden="true">✨</span>
+        <span class="relation-badge-text">THE CONNECTION</span>
+        <span class="relation-check" aria-hidden="true">✓</span>
+      </div>
+      <div class="relation-theme" id="relationTheme">PRIMARY COLORS</div>
+      <div class="relation-words" id="relationWords"></div>
+      <p class="relation-explanation" id="relationExplanation"></p>
+      <div class="relation-intruder-tag" id="relationIntruderTag">
+        <span class="intruder-pill">ODD</span>
+        <strong class="intruder-name" id="relationIntruderName">Toaster</strong>
+        <span class="intruder-reason" id="relationIntruderReason">✕ Appliance</span>
+      </div>
+      <div class="relation-footer">
+        <div class="relation-countdown" id="relationCountdown">
+          <div class="countdown-bar-wrap">
+            <div class="relation-timer-fill" id="relationTimerFill"></div>
+          </div>
+          <div class="countdown-sub">
+            <span class="countdown-sec" id="relationCountdownSec">NEXT IN 2.5s</span>
+            <span class="countdown-tap">TAP ANYWHERE TO SKIP ▸</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -431,6 +458,7 @@
 <script src="./js/audio.js?v=1.3.9"></script>
 <script src="./js/analytics.js?v=1.3.9"></script>
 <script src="./js/ads-policy.js?v=1.3.9"></script>
+<script src="./js/correct-reveal.js?v=1.3.9"></script>
 <script src="./js/app.js?v=1.3.9"></script>
 </body>
 </html>

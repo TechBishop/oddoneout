@@ -1355,6 +1355,23 @@
       setTimeout(() => this.finishRun(false, true), 560);
     }
 
+    fillRelationWords(el, words) {
+      if (!el) return;
+      el.replaceChildren();
+      words.forEach((word, index) => {
+        if (index > 0) {
+          const dot = document.createElement('span');
+          dot.className = 'relation-dot';
+          dot.textContent = '●';
+          el.appendChild(dot);
+        }
+        const chip = document.createElement('span');
+        chip.className = 'relation-word-chip';
+        chip.textContent = word;
+        el.appendChild(chip);
+      });
+    }
+
     triggerWinFeedback(gained, isUnlimited, isNewBest, reward, remSec) {
       const feedbackEl = document.getElementById('winFeedback');
       const sparkPill = document.getElementById('winSparkPill');
@@ -1381,24 +1398,48 @@
         return;
       }
 
-      // 1. Populate Theme & Words confirmation in middle of screen
-      const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
-      if (themeNameEl) themeNameEl.textContent = connectionTitle;
+      // The answering tap already stopped the round. Keep it stopped so the
+      // 2.5s explanation cannot burn the next puzzle's clock.
+      this.stopTimer();
+      this.pausedRemaining = null;
 
-      if (wordsEl) {
-        const validWords = (this.activeValidSample && this.activeValidSample.length)
-          ? this.activeValidSample
-          : (this.activeSet.validWords || []).slice(0, 3);
-        wordsEl.textContent = validWords.join(' · ');
+      const Reveal = window.OddOneOutReveal;
+      const reveal = Reveal
+        ? Reveal.buildCorrectReveal(this.activeSet, this.activeValidSample)
+        : {
+            durationMs: 2500,
+            skipAfterMs: 450,
+            category: (this.activeSet.shortCategory || this.activeSet.category || '').toUpperCase(),
+            words: (this.activeValidSample && this.activeValidSample.length)
+              ? this.activeValidSample.slice(0, 3)
+              : (this.activeSet.validWords || []).slice(0, 3),
+            intruder: this.activeSet.intruder || '',
+            shortTag: this.activeSet.shortTag || "Doesn't Fit",
+            explanation: typeof this.activeSet.explanation === 'string' ? this.activeSet.explanation : ''
+          };
+
+      if (themeNameEl) themeNameEl.textContent = reveal.category;
+      const relationTheme = document.getElementById('relationTheme');
+      if (relationTheme) relationTheme.textContent = reveal.category;
+
+      if (wordsEl) wordsEl.textContent = reveal.words.join(' · ');
+      this.fillRelationWords(document.getElementById('relationWords'), reveal.words);
+
+      if (intruderNameEl) intruderNameEl.textContent = reveal.intruder;
+      const relationIntruder = document.getElementById('relationIntruderName');
+      if (relationIntruder) relationIntruder.textContent = reveal.intruder;
+
+      const reasonText = `✕ ${reveal.shortTag}`;
+      if (intruderReasonEl) intruderReasonEl.textContent = reasonText;
+      const relationReason = document.getElementById('relationIntruderReason');
+      if (relationReason) relationReason.textContent = reasonText;
+
+      const explanationEl = document.getElementById('relationExplanation');
+      if (explanationEl) {
+        explanationEl.textContent = reveal.explanation;
+        explanationEl.classList.toggle('hidden', !reveal.explanation);
       }
 
-      if (intruderNameEl) intruderNameEl.textContent = this.activeSet.intruder;
-      if (intruderReasonEl) {
-        const shortTag = this.activeSet.shortTag || 'Doesn\'t Fit';
-        intruderReasonEl.textContent = `✕ ${shortTag}`;
-      }
-
-      // 2. Populate Sparks value & badge
       if (sparkIcon) sparkIcon.textContent = isUnlimited ? '🎯' : '⚡';
       if (sparkVal) {
         sparkVal.textContent = isUnlimited ? `STREAK ${this.streak}` : `+${gained} ⚡`;
@@ -1436,8 +1477,29 @@
         }
       }
 
-      // 3. Show feedback card in dead center of screen
       feedbackEl.classList.remove('hidden');
+
+      const secEl = document.getElementById('relationCountdownSec');
+      const totalSec = reveal.durationMs / 1000;
+      if (secEl) secEl.textContent = `NEXT IN ${totalSec.toFixed(1)}s`;
+      if (this.countdownInterval) clearInterval(this.countdownInterval);
+      const startRevealTime = Date.now();
+      this.countdownInterval = setInterval(() => {
+        const elapsed = (Date.now() - startRevealTime) / 1000;
+        const rem = Math.max(0, totalSec - elapsed);
+        if (secEl) secEl.textContent = `NEXT IN ${rem.toFixed(1)}s`;
+        if (rem <= 0) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
+      }, 100);
+
+      const fillEl = document.getElementById('relationTimerFill');
+      if (fillEl) {
+        fillEl.classList.remove('animating');
+        void fillEl.offsetWidth;
+        fillEl.classList.add('animating');
+      }
 
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
@@ -1445,7 +1507,6 @@
         window.oneShotFX.sparkBurst(centerX, centerY, isUnlimited ? '#33e6ff' : '#ffdc48');
       }
 
-      // Calculate deposit destination vector (towards #gameCoinsPill in header)
       const gameCoinsPill = document.getElementById('gameCoinsPill') || document.getElementById('coinsPill');
       const targetRect = gameCoinsPill ? gameCoinsPill.getBoundingClientRect() : { left: window.innerWidth / 2 - 25, top: 16, width: 50, height: 28 };
       const targetX = targetRect.left + targetRect.width / 2;
@@ -1466,12 +1527,18 @@
       const completeAndAdvance = () => {
         if (advanced) return;
         advanced = true;
+        this._completeWinFeedback = null;
         if (this.winTimer1) clearTimeout(this.winTimer1);
         if (this.winTimer2) clearTimeout(this.winTimer2);
+        this.winTimer1 = null;
+        this.winTimer2 = null;
+        if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
         feedbackEl.classList.add('hidden');
         if (sparkPill) sparkPill.classList.remove('zapping');
 
-        // Deposit sparks into balance
         if (!isUnlimited && gained > 0) {
           this.runSparks += gained;
           this.state.sparks += gained;
@@ -1488,14 +1555,21 @@
           this.nextRound();
         }
       };
+      this._completeWinFeedback = completeAndAdvance;
+      this.canSkipRevealAfter = Date.now() + reveal.skipAfterMs;
 
-      // Tapping anywhere immediately deposits and advances
-      feedbackEl.onclick = completeAndAdvance;
+      feedbackEl.onclick = () => {
+        const now = Date.now();
+        const allowed = Reveal
+          ? Reveal.canSkipReveal(now, this.canSkipRevealAfter)
+          : now >= this.canSkipRevealAfter;
+        if (!allowed) return;
+        completeAndAdvance();
+      };
 
-      // Phase 1: Card win feedback in center of screen (480ms)
+      const zapLead = 360;
       this.winTimer1 = setTimeout(() => {
         if (advanced) return;
-        // Phase 2: Deposit of Spark! Launch electric flight to header counter
         if (sparkPill && !isUnlimited && gained > 0) {
           sparkPill.classList.add('zapping');
           if (window.oneShotAudio && typeof window.oneShotAudio.playZap === 'function') {
@@ -1505,21 +1579,29 @@
             window.oneShotFX.zapTrail(pillCenterX, pillCenterY, targetX, targetY, '#ffdc48');
           }
         }
+      }, Math.max(0, reveal.durationMs - zapLead));
 
-        // Phase 3: Spark lands in header counter, deposits, and next round begins (360ms later)
-        this.winTimer2 = setTimeout(() => {
-          completeAndAdvance();
-        }, 360);
-      }, 480);
+      this.winTimer2 = setTimeout(() => {
+        completeAndAdvance();
+      }, reveal.durationMs);
     }
 
     hideWinFeedback() {
+      this._completeWinFeedback = null;
       if (this.winTimer1) clearTimeout(this.winTimer1);
       if (this.winTimer2) clearTimeout(this.winTimer2);
+      this.winTimer1 = null;
+      this.winTimer2 = null;
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+      }
       const feedbackEl = document.getElementById('winFeedback');
       if (feedbackEl) feedbackEl.classList.add('hidden');
       const sparkPill = document.getElementById('winSparkPill');
       if (sparkPill) sparkPill.classList.remove('zapping');
+      const fillEl = document.getElementById('relationTimerFill');
+      if (fillEl) fillEl.classList.remove('animating');
     }
 
     // Aliases for backward compatibility
@@ -1528,11 +1610,14 @@
     }
 
     skipThemeReveal() {
-      this.hideWinFeedback();
-      if (this.mode === 'daily' && this.round >= 5) {
-        this.finishDailySuccess();
-      } else {
-        this.nextRound();
+      const now = Date.now();
+      const Reveal = window.OddOneOutReveal;
+      const allowed = Reveal
+        ? Reveal.canSkipReveal(now, this.canSkipRevealAfter || 0)
+        : now >= (this.canSkipRevealAfter || 0);
+      if (!allowed) return;
+      if (typeof this._completeWinFeedback === 'function') {
+        this._completeWinFeedback();
       }
     }
 

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'oddoneout-v1.3.9-ads1';
+const CACHE_NAME = 'oddoneout-v1.3.9-reveal1';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -11,6 +11,7 @@ const CORE_ASSETS = [
   './js/audio.js',
   './js/analytics.js',
   './js/ads-policy.js',
+  './js/correct-reveal.js',
   './js/app.js'
 ];
 
