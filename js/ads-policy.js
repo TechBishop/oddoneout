@@ -6,9 +6,14 @@
  * and a missing plugin never grant a reward and never ask for a house ad.
  *
  * This file is part of the web bundle. The Capacitor app serves `webDir: www`,
- * so copy `js/ads-policy.js`, `js/app.js`, and `index.html` into that folder
- * and rebuild. Leave ADS_TEST_MODE and data-adbreak-test as they are in a
- * test build; switch both only for an intentional store build.
+ * so copy index.html, privacy.html, sw.js, js/app.js, and js/ads-policy.js
+ * into that folder and rebuild. The store build keeps ADS_TEST_MODE false and
+ * data-adbreak-test="off". A test build flips both to on together.
+ *
+ * Native UMP (User Messaging Platform) decisions live in planUmpConsent().
+ * They follow @capacitor-community/admob 8.2.1: requestConsentInfo(), then
+ * showConsentForm() when a form is required and available, then allow
+ * Mobile Ads initialization only when canRequestAds is true.
  */
 (function (root, factory) {
   const api = factory();
@@ -27,7 +32,8 @@
     'noAdPreloaded',
     'frequencyCapped',
     'other',
-    'ignored'
+    'ignored',
+    'consentRequired'
   ]);
 
   function isRewardType(type) {
@@ -69,6 +75,8 @@
         return 'No ad is available right now. No reward was granted.';
       case 'plugin_missing':
         return 'This build has no ad service. No reward was granted.';
+      case 'consentRequired':
+        return 'Ads stay off until the privacy choices are finished. No reward was granted.';
       case 'invalid':
         return 'This reward cannot be offered. Nothing was granted.';
       case 'cancelled':
@@ -222,6 +230,33 @@
     return settle(attempt, { reason: 'cancelled', grant: false, allowRetry: false });
   }
 
+  /**
+   * Next step for a @capacitor-community/admob 8.2.1 consent result.
+   *
+   * `requestConsentInfo()` / `showConsentForm()` both return:
+   * `{ status, isConsentFormAvailable, canRequestAds, privacyOptionsRequirementStatus }`
+   * with status `NOT_REQUIRED | OBTAINED | REQUIRED | UNKNOWN`.
+   *
+   * Pass phase `after_form` with the showConsentForm() result so a still-required
+   * form is not opened again in the same pass. Ads stay blocked until that
+   * result says canRequestAds. A missing or non-boolean canRequestAds blocks ads.
+   */
+  function planUmpConsent(info, phase) {
+    const status = info && typeof info.status === 'string' ? info.status : 'UNKNOWN';
+    const formAvailable = !!(info && info.isConsentFormAvailable);
+    const canRequestAds = !!(info && info.canRequestAds === true);
+    const showPrivacyOptions = !!(info && info.privacyOptionsRequirementStatus === 'REQUIRED');
+    const showForm = phase !== 'after_form' && formAvailable && status === 'REQUIRED';
+    const allowAds = !showForm && canRequestAds;
+    return {
+      status: status,
+      showForm: showForm,
+      canRequestAds: allowAds,
+      showPrivacyOptions: showPrivacyOptions,
+      blocked: !allowAds && !showForm
+    };
+  }
+
   function onNativeFailure(attempt, reason) {
     if (!attempt || attempt.phase === 'settled') return finish(attempt, false, false);
     const code = reason || 'error';
@@ -244,6 +279,7 @@
     onBreakDone: onBreakDone,
     onTimeout: onTimeout,
     onCancel: onCancel,
-    onNativeFailure: onNativeFailure
+    onNativeFailure: onNativeFailure,
+    planUmpConsent: planUmpConsent
   };
 });

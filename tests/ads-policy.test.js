@@ -171,15 +171,25 @@ test('cancel does not interrupt an ad that is already showing', () => {
   assert.equal(viewed.justGranted, true);
 });
 
-test('shipped web bundle keeps test mode and does not grant from a simulated video', () => {
+test('store build uses live ads and still keeps Google test placements for test builds', () => {
   const root = path.join(__dirname, '..');
   const app = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
   const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+  const sw = fs.readFileSync(path.join(root, 'sw.js'), 'utf8');
+  const appAds = fs.readFileSync(path.join(root, 'app-ads.txt'), 'utf8').trim();
 
-  assert.match(app, /const ADS_TEST_MODE = true/);
-  assert.match(html, /data-adbreak-test="on"/);
+  assert.match(app, /const APP_VERSION = '1\.4\.0'/);
+  assert.match(app, /const ADS_TEST_MODE = false/);
+  assert.match(html, /data-adbreak-test="off"/);
+  assert.match(html, /Odd One Out v1\.4\.0/);
+  assert.match(sw, /const CACHE_NAME = 'oddoneout-v1\.4\.0'/);
+  assert.equal(appAds, 'google.com, pub-2691430114035059, DIRECT, f08c47fec0942fa0');
+  assert.match(html, /ca-pub-2691430114035059/);
+  // Test placements stay in source so a test build can flip ADS_TEST_MODE on.
   assert.match(app, /ca-app-pub-3940256099942544\/5224354917/);
+  assert.match(app, /ca-app-pub-3940256099942544\/1712485313/);
   assert.match(app, /ca-app-pub-2691430114035059\/1849524787/);
+  assert.match(app, /ca-app-pub-2691430114035059\/5689531599/);
   assert.match(app, /const adUnitId = ADS_TEST_MODE/);
   assert.match(app, /justGranted/);
   assert.match(app, /addListener\(FailedToLoadEvent/);
@@ -193,4 +203,109 @@ test('shipped web bundle keeps test mode and does not grant from a simulated vid
   assert.doesNotMatch(html, /claimRewardBtn/);
   assert.match(html, /js\/ads-policy\.js/);
   assert.match(app, /OddOneOutAds/);
+});
+
+test('unfinished ad privacy choices do not grant', () => {
+  const { attempt } = start();
+  const decision = Ads.onNativeFailure(attempt, 'consentRequired');
+  assert.equal(decision.grant, false);
+  assert.equal(decision.justGranted, false);
+  assert.equal(decision.allowRetry, true);
+  assert.equal(decision.houseAd, false);
+  assert.match(decision.subtitle, /privacy choices/i);
+  assert.match(decision.subtitle, /no reward was granted/i);
+});
+
+test('UMP shows a required form before ads and honors canRequestAds', () => {
+  const required = Ads.planUmpConsent({
+    status: 'REQUIRED',
+    isConsentFormAvailable: true,
+    canRequestAds: true,
+    privacyOptionsRequirementStatus: 'UNKNOWN'
+  });
+  assert.equal(required.showForm, true);
+  assert.equal(required.canRequestAds, false);
+  assert.equal(required.blocked, false);
+
+  const obtained = Ads.planUmpConsent({
+    status: 'OBTAINED',
+    isConsentFormAvailable: true,
+    canRequestAds: true,
+    privacyOptionsRequirementStatus: 'REQUIRED'
+  }, 'after_form');
+  assert.equal(obtained.showForm, false);
+  assert.equal(obtained.canRequestAds, true);
+  assert.equal(obtained.showPrivacyOptions, true);
+
+  const notRequired = Ads.planUmpConsent({
+    status: 'NOT_REQUIRED',
+    isConsentFormAvailable: false,
+    canRequestAds: true,
+    privacyOptionsRequirementStatus: 'NOT_REQUIRED'
+  });
+  assert.equal(notRequired.showForm, false);
+  assert.equal(notRequired.canRequestAds, true);
+  assert.equal(notRequired.showPrivacyOptions, false);
+
+  const declined = Ads.planUmpConsent({
+    status: 'OBTAINED',
+    isConsentFormAvailable: false,
+    canRequestAds: false,
+    privacyOptionsRequirementStatus: 'REQUIRED'
+  }, 'after_form');
+  assert.equal(declined.canRequestAds, false);
+  assert.equal(declined.blocked, true);
+  assert.equal(declined.showPrivacyOptions, true);
+
+  const missing = Ads.planUmpConsent(null);
+  assert.equal(missing.status, 'UNKNOWN');
+  assert.equal(missing.showForm, false);
+  assert.equal(missing.canRequestAds, false);
+  assert.equal(missing.blocked, true);
+
+  const noForm = Ads.planUmpConsent({
+    status: 'REQUIRED',
+    isConsentFormAvailable: false,
+    canRequestAds: false
+  });
+  assert.equal(noForm.showForm, false);
+  assert.equal(noForm.canRequestAds, false);
+});
+
+test('native ads wait for UMP consent and the web path does not', () => {
+  const root = path.join(__dirname, '..');
+  const app = fs.readFileSync(path.join(root, 'js/app.js'), 'utf8');
+  const html = fs.readFileSync(path.join(root, 'index.html'), 'utf8');
+
+  assert.match(app, /if \(this\.isNativeShell\(\)\) \{\n\s+this\.ensureNativeAdConsent\(\);/);
+  assert.match(html, /id="privacyOptionsRow"/);
+  assert.match(html, /openPrivacyOptions/);
+  assert.match(html, /oddOneOutNative/);
+  assert.match(html, /preloadAdBreaks: 'on'/);
+
+  const flowStart = app.indexOf('async runNativeConsentFlow()');
+  const flowEnd = app.indexOf('async initializeNativeAdMob(');
+  const flow = app.slice(flowStart, flowEnd);
+  assert.ok(flowStart !== -1 && flowEnd > flowStart);
+  assert.match(flow, /requestConsentInfo/);
+  assert.match(flow, /showConsentForm/);
+  assert.match(flow, /planUmpConsent/);
+  assert.match(flow, /decision\.canRequestAds === true/);
+  assert.doesNotMatch(flow, /plugin\.initialize/);
+  assert.doesNotMatch(flow, /prepareRewardVideoAd/);
+
+  const showStart = app.indexOf('async showNativeCapacitorRewardedAd');
+  const showEnd = app.indexOf('showWebRewardedAd(type) {');
+  const show = app.slice(showStart, showEnd);
+  const consentAt = show.indexOf('ensureNativeAdConsent');
+  const initAt = show.indexOf('initializeNativeAdMob');
+  const prepareAt = show.indexOf('prepareRewardVideoAd');
+  assert.ok(consentAt !== -1 && initAt > consentAt && prepareAt > initAt);
+  assert.match(show, /consentRequired/);
+
+  const webStart = app.indexOf('showWebRewardedAd(type) {');
+  const webEnd = app.indexOf('claimActiveReward()');
+  assert.ok(webStart !== -1 && webEnd > webStart);
+  assert.doesNotMatch(app.slice(webStart, webEnd), /requestConsentInfo/);
+  assert.match(app, /showPrivacyOptionsForm/);
 });

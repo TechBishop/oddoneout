@@ -11,14 +11,14 @@
   <link rel="manifest" href="./manifest.webmanifest">
   <link rel="icon" type="image/svg+xml" href="./icons/icon.svg">
   <link rel="apple-touch-icon" href="./icons/icon.svg">
-  <title>Odd One Out v1.3.9 — Fast Word Game</title>
-  <link rel="stylesheet" href="./styles.css?v=1.3.9">
+  <title>Odd One Out v1.4.0 — Fast Word Game</title>
+  <link rel="stylesheet" href="./styles.css?v=1.4.0">
 
-  <!-- GOOGLE ADSENSE (H5 GAMES ADS API) -->
+  <!-- GOOGLE ADSENSE (H5 GAMES ADS API). data-adbreak-test must match ADS_TEST_MODE. -->
   <script async
     data-ad-client="ca-pub-2691430114035059"
     data-ad-frequency-hint="0s"
-    data-adbreak-test="on"
+    data-adbreak-test="off"
     crossorigin="anonymous"
     src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js">
   </script>
@@ -26,10 +26,18 @@
     window.adsbygoogle = window.adsbygoogle || [];
     window.adBreak = function(o) { adsbygoogle.push(o); };
     window.adConfig = function(o) { adsbygoogle.push(o); };
-    window.adConfig({
-      preloadAdBreaks: 'on',
-      sound: 'on'
-    });
+    // Web and PWA preload ad breaks immediately. The native shell skips this
+    // so the WebView does not request AdSense ads before UMP consent in app.js.
+    var oddOneOutNative = false;
+    try {
+      oddOneOutNative = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+    } catch (e) {}
+    if (!oddOneOutNative) {
+      window.adConfig({
+        preloadAdBreaks: 'on',
+        sound: 'on'
+      });
+    }
   </script>
 </head>
 <body>
@@ -190,7 +198,7 @@
 
     <!-- 6. VERSION STAMP -->
     <div class="home-bottom-wrap">
-      <div class="home-version-tag" id="homeVersionTag">ODD ONE OUT · v1.3.9</div>
+      <div class="home-version-tag" id="homeVersionTag">ODD ONE OUT · v1.4.0</div>
     </div>
   </section>
 
@@ -223,7 +231,7 @@
 
     <button class="primary" onclick="app.startQuickShot()">START PLAYING</button>
     <button class="secondary" onclick="app.showScreen('home')">BACK</button>
-    <div class="howto-version-tag">ODD ONE OUT · v1.3.9</div>
+    <div class="howto-version-tag">ODD ONE OUT · v1.4.0</div>
   </section>
 
   <!-- SHOP & PACKS SCREEN -->
@@ -392,6 +400,14 @@
         <button class="toggle-btn" id="toggleAdult" onclick="app.cycleAdultMode()">OFF</button>
       </div>
 
+      <div class="setting-row hidden" id="privacyOptionsRow">
+        <div>
+          <b>Privacy options</b>
+          <span>Review your ad privacy choices</span>
+        </div>
+        <button class="toggle-btn on" id="privacyOptionsBtn" type="button" onclick="app.openPrivacyOptions()">OPEN</button>
+      </div>
+
       <details class="telemetry-details">
         <summary>📊 Game Stats</summary>
         <div class="telemetry-box" id="telemetryBox"></div>
@@ -402,7 +418,7 @@
       <button class="secondary" onclick="app.resetProgress()">RESET DATA</button>
       <button class="primary" id="settingsDoneBtn" style="padding:13px" onclick="app.closeSettings()">DONE</button>
     </div>
-    <div class="settings-version-tag">ODD ONE OUT · v1.3.9</div>
+    <div class="settings-version-tag">ODD ONE OUT · v1.4.0</div>
   </div>
 </div>
 
@@ -453,12 +469,12 @@
 
 <canvas id="fxCanvas" class="fx-canvas"></canvas>
 
-<script src="./js/packs-data.js?v=1.3.9"></script>
-<script src="./js/fx.js?v=1.3.9"></script>
-<script src="./js/audio.js?v=1.3.9"></script>
-<script src="./js/analytics.js?v=1.3.9"></script>
-<script src="./js/ads-policy.js?v=1.3.9"></script>
-<script src="./js/correct-reveal.js?v=1.3.9"></script>
-<script src="./js/app.js?v=1.3.9"></script>
+<script src="./js/packs-data.js?v=1.4.0"></script>
+<script src="./js/fx.js?v=1.4.0"></script>
+<script src="./js/audio.js?v=1.4.0"></script>
+<script src="./js/analytics.js?v=1.4.0"></script>
+<script src="./js/ads-policy.js?v=1.4.0"></script>
+<script src="./js/correct-reveal.js?v=1.4.0"></script>
+<script src="./js/app.js?v=1.4.0"></script>
 </body>
 </html>

@@ -4,12 +4,11 @@
  */
 (function () {
   const $ = (id) => document.getElementById(id);
-  const APP_VERSION = '1.3.9';
-  // Test builds stay on Google's test placements. ADS_TEST_MODE does not
-  // guarantee fill: AdSense test mode alternates a mock ad and no-fill.
-  // Set this false only for an intentional store build, and remove
-  // data-adbreak-test="on" from index.html in that same build.
-  const ADS_TEST_MODE = true;
+  const APP_VERSION = '1.4.0';
+  // Store build: live placements. ADS_TEST_MODE does not guarantee fill.
+  // A test build sets this true and data-adbreak-test="on" in index.html
+  // together. app.js warns when the two flags disagree.
+  const ADS_TEST_MODE = false;
   const SAVE_KEY = 'oneshot_save_v1';
   console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED (ADS_TEST_MODE=${ADS_TEST_MODE})`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
 
@@ -314,6 +313,9 @@
 
       this.checkUrlParams();
       this.warnIfAdTestConfigDisagrees();
+      if (this.isNativeShell()) {
+        this.ensureNativeAdConsent();
+      }
     }
 
     warnIfAdTestConfigDisagrees() {
@@ -2101,6 +2103,99 @@
       }
     }
 
+    /**
+     * Google UMP via @capacitor-community/admob 8.2.1.
+     * Native only. Web and PWA keep using AdSense and never call this for a grant.
+     * Resolves when ads may be requested, or when they must stay blocked.
+     * A denied or unfinished result is not cached, so a later retry can show the form again.
+     */
+    ensureNativeAdConsent() {
+      if (!this.isNativeShell()) {
+        return Promise.resolve({ canRequestAds: false, native: false, showPrivacyOptions: false });
+      }
+      if (this._consentDecision && this._consentDecision.canRequestAds === true) {
+        return Promise.resolve(this._consentDecision);
+      }
+      if (this._consentInFlight) return this._consentInFlight;
+      this._consentInFlight = this.runNativeConsentFlow().finally(() => {
+        this._consentInFlight = null;
+      });
+      return this._consentInFlight;
+    }
+
+    applyConsentDecision(decision) {
+      this._consentDecision = decision || { canRequestAds: false, showPrivacyOptions: false };
+      const row = document.getElementById('privacyOptionsRow');
+      if (row) row.classList.toggle('hidden', !this._consentDecision.showPrivacyOptions);
+    }
+
+    async runNativeConsentFlow() {
+      const Ads = this.rewardAdsApi();
+      const AdMob = window.Capacitor?.Plugins?.AdMob;
+      const blocked = { canRequestAds: false, showForm: false, showPrivacyOptions: false, blocked: true };
+      if (!Ads || !AdMob || typeof AdMob.requestConsentInfo !== 'function') {
+        console.warn('[AdMob] UMP consent API is missing. Ads will not load.');
+        this.applyConsentDecision(blocked);
+        return blocked;
+      }
+      try {
+        let info = await AdMob.requestConsentInfo();
+        let decision = Ads.planUmpConsent(info);
+        this.applyConsentDecision(decision);
+        if (decision.showForm) {
+          if (typeof AdMob.showConsentForm !== 'function') {
+            this.applyConsentDecision(blocked);
+            return blocked;
+          }
+          info = await AdMob.showConsentForm();
+          decision = Ads.planUmpConsent(info, 'after_form');
+          this.applyConsentDecision(decision);
+        }
+        if (decision.canRequestAds === true) {
+          await this.initializeNativeAdMob(AdMob);
+        }
+        return decision;
+      } catch (err) {
+        console.warn('[AdMob] UMP consent failed:', err);
+        this.applyConsentDecision(blocked);
+        return blocked;
+      }
+    }
+
+    async initializeNativeAdMob(AdMob) {
+      if (this.admobInitialized) return;
+      if (!this._consentDecision || this._consentDecision.canRequestAds !== true) return;
+      const plugin = AdMob || window.Capacitor?.Plugins?.AdMob;
+      if (!plugin || typeof plugin.initialize !== 'function') return;
+      console.log(`[AdMob] Initializing AdMob plugin with initializeForTesting: ${ADS_TEST_MODE}...`);
+      await plugin.initialize({
+        initializeForTesting: ADS_TEST_MODE,
+      }).catch((e) => console.warn('[AdMob] initialize warning:', e));
+      this.admobInitialized = true;
+    }
+
+    async openPrivacyOptions() {
+      if (!this.isNativeShell()) return;
+      const AdMob = window.Capacitor?.Plugins?.AdMob;
+      const Ads = this.rewardAdsApi();
+      if (!AdMob || typeof AdMob.showPrivacyOptionsForm !== 'function' || !Ads) {
+        this.showFloatingBurst('Privacy options are not available in this build.');
+        return;
+      }
+      try {
+        await AdMob.showPrivacyOptionsForm();
+        if (typeof AdMob.requestConsentInfo === 'function') {
+          const info = await AdMob.requestConsentInfo();
+          const decision = Ads.planUmpConsent(info, 'after_form');
+          this.applyConsentDecision(decision);
+          if (decision.canRequestAds === true) await this.initializeNativeAdMob(AdMob);
+        }
+      } catch (err) {
+        console.warn('[AdMob] showPrivacyOptionsForm failed:', err);
+        this.showFloatingBurst('Privacy options could not be opened.');
+      }
+    }
+
     async showNativeCapacitorRewardedAd(type) {
       console.log('[AdMob] showNativeCapacitorRewardedAd called, type:', type, 'testMode:', ADS_TEST_MODE);
       const Ads = this.rewardAdsApi();
@@ -2119,6 +2214,13 @@
       if (!AdMob) {
         console.warn('[AdMob] Plugin not available on window.Capacitor.Plugins');
         this.presentRewardDecision(Ads.onNativeFailure(attempt, 'plugin_missing'));
+        return;
+      }
+
+      const consent = await this.ensureNativeAdConsent();
+      if (attempt.phase !== 'loading') return;
+      if (!consent || consent.canRequestAds !== true) {
+        this.presentRewardDecision(Ads.onNativeFailure(attempt, 'consentRequired'));
         return;
       }
 
@@ -2148,13 +2250,7 @@
       }, Ads.LOAD_TIMEOUT_MS);
 
       try {
-        if (!this.admobInitialized) {
-          console.log(`[AdMob] Initializing AdMob plugin with initializeForTesting: ${ADS_TEST_MODE}...`);
-          await AdMob.initialize({
-            initializeForTesting: ADS_TEST_MODE,
-          }).catch((e) => console.warn('[AdMob] initialize warning:', e));
-          this.admobInitialized = true;
-        }
+        await this.initializeNativeAdMob(AdMob);
         if (abandoned || attempt.phase !== 'loading') return;
 
         const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'android';
@@ -2948,6 +3044,10 @@
         $('toggleAdult').textContent =
           mode === 'only' ? '18+ ONLY' : mode === 'mix' ? '18+ MIX' : 'OFF';
         $('toggleAdult').classList.toggle('on', mode !== 'off');
+      }
+      if ($('privacyOptionsRow')) {
+        const showPrivacy = !!(this._consentDecision && this._consentDecision.showPrivacyOptions);
+        $('privacyOptionsRow').classList.toggle('hidden', !showPrivacy);
       }
 
       if ($('telemetryBox') && window.oneShotAnalytics) {
