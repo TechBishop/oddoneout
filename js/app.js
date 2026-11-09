@@ -5,7 +5,11 @@
 (function () {
   const $ = (id) => document.getElementById(id);
   const APP_VERSION = '1.3.9';
-  const ADS_TEST_MODE = true; // Set to true for guaranteed Google test ads; false for live store ads
+  // Test builds stay on Google's test placements. ADS_TEST_MODE does not
+  // guarantee fill: AdSense test mode alternates a mock ad and no-fill.
+  // Set this false only for an intentional store build, and remove
+  // data-adbreak-test="on" from index.html in that same build.
+  const ADS_TEST_MODE = true;
   const SAVE_KEY = 'oneshot_save_v1';
   console.log(`%c⚡ ODD ONE OUT v${APP_VERSION} INITIALIZED (ADS_TEST_MODE=${ADS_TEST_MODE})`, 'color: #33e6ff; font-weight: 900; font-size: 13px;');
 
@@ -309,6 +313,17 @@
       });
 
       this.checkUrlParams();
+      this.warnIfAdTestConfigDisagrees();
+    }
+
+    warnIfAdTestConfigDisagrees() {
+      try {
+        const script = document.querySelector('script[src*="adsbygoogle.js"]');
+        const webTest = !!(script && script.getAttribute('data-adbreak-test') === 'on');
+        if (webTest !== ADS_TEST_MODE) {
+          console.warn('[Ad] ADS_TEST_MODE and data-adbreak-test disagree. Change both together, and only for an intentional store build.');
+        }
+      } catch (_) {}
     }
 
     isRoundActive() {
@@ -1340,6 +1355,23 @@
       setTimeout(() => this.finishRun(false, true), 560);
     }
 
+    fillRelationWords(el, words) {
+      if (!el) return;
+      el.replaceChildren();
+      words.forEach((word, index) => {
+        if (index > 0) {
+          const dot = document.createElement('span');
+          dot.className = 'relation-dot';
+          dot.textContent = '●';
+          el.appendChild(dot);
+        }
+        const chip = document.createElement('span');
+        chip.className = 'relation-word-chip';
+        chip.textContent = word;
+        el.appendChild(chip);
+      });
+    }
+
     triggerWinFeedback(gained, isUnlimited, isNewBest, reward, remSec) {
       const feedbackEl = document.getElementById('winFeedback');
       const sparkPill = document.getElementById('winSparkPill');
@@ -1366,24 +1398,48 @@
         return;
       }
 
-      // 1. Populate Theme & Words confirmation in middle of screen
-      const connectionTitle = (this.activeSet.shortCategory || this.activeSet.category).toUpperCase();
-      if (themeNameEl) themeNameEl.textContent = connectionTitle;
+      // The answering tap already stopped the round. Keep it stopped so the
+      // 2.5s explanation cannot burn the next puzzle's clock.
+      this.stopTimer();
+      this.pausedRemaining = null;
 
-      if (wordsEl) {
-        const validWords = (this.activeValidSample && this.activeValidSample.length)
-          ? this.activeValidSample
-          : (this.activeSet.validWords || []).slice(0, 3);
-        wordsEl.textContent = validWords.join(' · ');
+      const Reveal = window.OddOneOutReveal;
+      const reveal = Reveal
+        ? Reveal.buildCorrectReveal(this.activeSet, this.activeValidSample)
+        : {
+            durationMs: 2500,
+            skipAfterMs: 450,
+            category: (this.activeSet.shortCategory || this.activeSet.category || '').toUpperCase(),
+            words: (this.activeValidSample && this.activeValidSample.length)
+              ? this.activeValidSample.slice(0, 3)
+              : (this.activeSet.validWords || []).slice(0, 3),
+            intruder: this.activeSet.intruder || '',
+            shortTag: this.activeSet.shortTag || "Doesn't Fit",
+            explanation: typeof this.activeSet.explanation === 'string' ? this.activeSet.explanation : ''
+          };
+
+      if (themeNameEl) themeNameEl.textContent = reveal.category;
+      const relationTheme = document.getElementById('relationTheme');
+      if (relationTheme) relationTheme.textContent = reveal.category;
+
+      if (wordsEl) wordsEl.textContent = reveal.words.join(' · ');
+      this.fillRelationWords(document.getElementById('relationWords'), reveal.words);
+
+      if (intruderNameEl) intruderNameEl.textContent = reveal.intruder;
+      const relationIntruder = document.getElementById('relationIntruderName');
+      if (relationIntruder) relationIntruder.textContent = reveal.intruder;
+
+      const reasonText = `✕ ${reveal.shortTag}`;
+      if (intruderReasonEl) intruderReasonEl.textContent = reasonText;
+      const relationReason = document.getElementById('relationIntruderReason');
+      if (relationReason) relationReason.textContent = reasonText;
+
+      const explanationEl = document.getElementById('relationExplanation');
+      if (explanationEl) {
+        explanationEl.textContent = reveal.explanation;
+        explanationEl.classList.toggle('hidden', !reveal.explanation);
       }
 
-      if (intruderNameEl) intruderNameEl.textContent = this.activeSet.intruder;
-      if (intruderReasonEl) {
-        const shortTag = this.activeSet.shortTag || 'Doesn\'t Fit';
-        intruderReasonEl.textContent = `✕ ${shortTag}`;
-      }
-
-      // 2. Populate Sparks value & badge
       if (sparkIcon) sparkIcon.textContent = isUnlimited ? '🎯' : '⚡';
       if (sparkVal) {
         sparkVal.textContent = isUnlimited ? `STREAK ${this.streak}` : `+${gained} ⚡`;
@@ -1421,8 +1477,29 @@
         }
       }
 
-      // 3. Show feedback card in dead center of screen
       feedbackEl.classList.remove('hidden');
+
+      const secEl = document.getElementById('relationCountdownSec');
+      const totalSec = reveal.durationMs / 1000;
+      if (secEl) secEl.textContent = `NEXT IN ${totalSec.toFixed(1)}s`;
+      if (this.countdownInterval) clearInterval(this.countdownInterval);
+      const startRevealTime = Date.now();
+      this.countdownInterval = setInterval(() => {
+        const elapsed = (Date.now() - startRevealTime) / 1000;
+        const rem = Math.max(0, totalSec - elapsed);
+        if (secEl) secEl.textContent = `NEXT IN ${rem.toFixed(1)}s`;
+        if (rem <= 0) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
+      }, 100);
+
+      const fillEl = document.getElementById('relationTimerFill');
+      if (fillEl) {
+        fillEl.classList.remove('animating');
+        void fillEl.offsetWidth;
+        fillEl.classList.add('animating');
+      }
 
       const centerX = window.innerWidth / 2;
       const centerY = window.innerHeight / 2;
@@ -1430,7 +1507,6 @@
         window.oneShotFX.sparkBurst(centerX, centerY, isUnlimited ? '#33e6ff' : '#ffdc48');
       }
 
-      // Calculate deposit destination vector (towards #gameCoinsPill in header)
       const gameCoinsPill = document.getElementById('gameCoinsPill') || document.getElementById('coinsPill');
       const targetRect = gameCoinsPill ? gameCoinsPill.getBoundingClientRect() : { left: window.innerWidth / 2 - 25, top: 16, width: 50, height: 28 };
       const targetX = targetRect.left + targetRect.width / 2;
@@ -1451,12 +1527,18 @@
       const completeAndAdvance = () => {
         if (advanced) return;
         advanced = true;
+        this._completeWinFeedback = null;
         if (this.winTimer1) clearTimeout(this.winTimer1);
         if (this.winTimer2) clearTimeout(this.winTimer2);
+        this.winTimer1 = null;
+        this.winTimer2 = null;
+        if (this.countdownInterval) {
+          clearInterval(this.countdownInterval);
+          this.countdownInterval = null;
+        }
         feedbackEl.classList.add('hidden');
         if (sparkPill) sparkPill.classList.remove('zapping');
 
-        // Deposit sparks into balance
         if (!isUnlimited && gained > 0) {
           this.runSparks += gained;
           this.state.sparks += gained;
@@ -1473,14 +1555,21 @@
           this.nextRound();
         }
       };
+      this._completeWinFeedback = completeAndAdvance;
+      this.canSkipRevealAfter = Date.now() + reveal.skipAfterMs;
 
-      // Tapping anywhere immediately deposits and advances
-      feedbackEl.onclick = completeAndAdvance;
+      feedbackEl.onclick = () => {
+        const now = Date.now();
+        const allowed = Reveal
+          ? Reveal.canSkipReveal(now, this.canSkipRevealAfter)
+          : now >= this.canSkipRevealAfter;
+        if (!allowed) return;
+        completeAndAdvance();
+      };
 
-      // Phase 1: Card win feedback in center of screen (480ms)
+      const zapLead = 360;
       this.winTimer1 = setTimeout(() => {
         if (advanced) return;
-        // Phase 2: Deposit of Spark! Launch electric flight to header counter
         if (sparkPill && !isUnlimited && gained > 0) {
           sparkPill.classList.add('zapping');
           if (window.oneShotAudio && typeof window.oneShotAudio.playZap === 'function') {
@@ -1490,21 +1579,29 @@
             window.oneShotFX.zapTrail(pillCenterX, pillCenterY, targetX, targetY, '#ffdc48');
           }
         }
+      }, Math.max(0, reveal.durationMs - zapLead));
 
-        // Phase 3: Spark lands in header counter, deposits, and next round begins (360ms later)
-        this.winTimer2 = setTimeout(() => {
-          completeAndAdvance();
-        }, 360);
-      }, 480);
+      this.winTimer2 = setTimeout(() => {
+        completeAndAdvance();
+      }, reveal.durationMs);
     }
 
     hideWinFeedback() {
+      this._completeWinFeedback = null;
       if (this.winTimer1) clearTimeout(this.winTimer1);
       if (this.winTimer2) clearTimeout(this.winTimer2);
+      this.winTimer1 = null;
+      this.winTimer2 = null;
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+      }
       const feedbackEl = document.getElementById('winFeedback');
       if (feedbackEl) feedbackEl.classList.add('hidden');
       const sparkPill = document.getElementById('winSparkPill');
       if (sparkPill) sparkPill.classList.remove('zapping');
+      const fillEl = document.getElementById('relationTimerFill');
+      if (fillEl) fillEl.classList.remove('animating');
     }
 
     // Aliases for backward compatibility
@@ -1513,11 +1610,14 @@
     }
 
     skipThemeReveal() {
-      this.hideWinFeedback();
-      if (this.mode === 'daily' && this.round >= 5) {
-        this.finishDailySuccess();
-      } else {
-        this.nextRound();
+      const now = Date.now();
+      const Reveal = window.OddOneOutReveal;
+      const allowed = Reveal
+        ? Reveal.canSkipReveal(now, this.canSkipRevealAfter || 0)
+        : now >= (this.canSkipRevealAfter || 0);
+      if (!allowed) return;
+      if (typeof this._completeWinFeedback === 'function') {
+        this._completeWinFeedback();
       }
     }
 
@@ -1882,56 +1982,148 @@
       }
     }
 
+    rewardAdsApi() {
+      return window.OddOneOutAds || null;
+    }
+
+    isNativeShell() {
+      return typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+    }
+
+    muteGameAudioForAd(active) {
+      const audio = window.oneShotAudio;
+      if (!audio) return;
+      if (active) {
+        if (this._adSoundRestore == null) this._adSoundRestore = !!audio.soundEnabled;
+        audio.soundEnabled = false;
+        return;
+      }
+      if (this._adSoundRestore != null) {
+        audio.soundEnabled = this._adSoundRestore;
+        this._adSoundRestore = null;
+      }
+    }
+
+    hideRewardStatus() {
+      const overlay = document.getElementById('rewardedAdModal');
+      if (overlay) overlay.classList.remove('show');
+    }
+
+    presentRewardDecision(decision) {
+      if (!decision) return;
+      if (decision.justGranted && decision.type) {
+        this.hideRewardStatus();
+        this.grantAdReward(decision.type);
+        return;
+      }
+      if (!decision.showModal) {
+        this.hideRewardStatus();
+        return;
+      }
+      this.renderRewardStatus(decision);
+    }
+
+    renderRewardStatus(decision) {
+      const overlay = document.getElementById('rewardedAdModal');
+      if (!overlay) return;
+      const category = document.getElementById('rewardedAdCategory');
+      const title = document.getElementById('rewardedAdTitle');
+      const subtitle = document.getElementById('rewardedAdSubtitle');
+      const retryBtn = document.getElementById('rewardedAdRetryBtn');
+      const dismissBtn = document.getElementById('rewardedAdDismissBtn');
+
+      if (category) {
+        category.textContent = decision.type === 'revive' ? 'REVIVE' : '2X SPARKS';
+      }
+      if (title) title.textContent = decision.title || 'Rewarded ad';
+      if (subtitle) subtitle.textContent = decision.subtitle || decision.message || '';
+      if (retryBtn) {
+        const showRetry = decision.phase === 'settled' && decision.allowRetry;
+        retryBtn.classList.toggle('hidden', !showRetry);
+        retryBtn.disabled = !showRetry;
+      }
+      if (dismissBtn) {
+        dismissBtn.textContent = decision.phase === 'loading' ? 'CANCEL' : 'CONTINUE WITHOUT REWARD';
+      }
+      overlay.classList.add('show');
+      const focusTarget = (retryBtn && !retryBtn.classList.contains('hidden')) ? retryBtn : dismissBtn;
+      if (focusTarget && typeof focusTarget.focus === 'function') focusTarget.focus();
+    }
+
+    retryRewardedAd() {
+      const attempt = this._rewardAttempt;
+      if (!attempt || attempt.phase !== 'settled' || !attempt.allowRetry || !attempt.type) return;
+      const type = attempt.type;
+      this._rewardAttempt = null;
+      this.triggerRewardedAd(type);
+    }
+
     triggerRewardedAd(type) {
+      if (this._rewardAttempt && (this._rewardAttempt.phase === 'loading' || this._rewardAttempt.phase === 'showing')) {
+        this.showFloatingBurst('Still checking for an ad…');
+        return;
+      }
       if (window.oneShotAudio) window.oneShotAudio.playTap();
       this.pendingAdAction = type;
 
-      const isNative = typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+      const Ads = this.rewardAdsApi();
+      if (!Ads) {
+        this.showFloatingBurst('Ad service unavailable. No reward was granted.');
+        this.pendingAdAction = null;
+        return;
+      }
 
-      // Check for native Capacitor AdMob plugin
+      const isNative = this.isNativeShell();
       if (isNative && window.Capacitor?.Plugins?.AdMob) {
         this.showNativeCapacitorRewardedAd(type);
         return;
       }
-
-      // Check for Google H5 Games Ads / Web AdBreak (browser)
-      if (window.adBreak || window.showAds) {
+      if (isNative) {
+        const attempt = Ads.createAttempt(type);
+        this._rewardAttempt = attempt;
+        Ads.beginLoad(attempt, { online: navigator.onLine !== false });
+        this.presentRewardDecision(Ads.onNativeFailure(attempt, 'plugin_missing'));
+        return;
+      }
+      if (typeof window.adBreak === 'function') {
         this.showWebRewardedAd(type);
         return;
       }
+      const attempt = Ads.createAttempt(type);
+      this._rewardAttempt = attempt;
+      this.presentRewardDecision(Ads.onNativeFailure(attempt, 'plugin_missing'));
+    }
 
-      // Interactive rewarded ad modal ONLY when NOT running natively
-      if (!isNative) {
-        this.openRewardedAdModal(type);
-      } else {
-        this.showFloatingBurst('Ads temporarily unavailable');
-        this.cancelRewardedAd();
+    clearAdLoadTimer() {
+      if (this._adLoadTimer) {
+        clearTimeout(this._adLoadTimer);
+        this._adLoadTimer = null;
       }
     }
 
     async showNativeCapacitorRewardedAd(type) {
       console.log('[AdMob] showNativeCapacitorRewardedAd called, type:', type, 'testMode:', ADS_TEST_MODE);
-      const isNative = typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
+      const Ads = this.rewardAdsApi();
+      if (!Ads) return;
 
-      if (this.isAdLoading) {
-        console.log('[AdMob] Ad is already loading, ignoring concurrent request');
-        this.showFloatingBurst('Loading ad...');
+      const attempt = Ads.createAttempt(type);
+      this._rewardAttempt = attempt;
+      const started = Ads.beginLoad(attempt, { online: navigator.onLine !== false });
+      if (started.phase === 'settled') {
+        this.presentRewardDecision(started);
         return;
       }
+      this.presentRewardDecision(started);
 
       const AdMob = window.Capacitor?.Plugins?.AdMob;
       if (!AdMob) {
         console.warn('[AdMob] Plugin not available on window.Capacitor.Plugins');
-        if (!isNative) {
-          this.openRewardedAdModal(type);
-        } else {
-          this.showFloatingBurst('Ad service unavailable');
-          this.cancelRewardedAd();
-        }
+        this.presentRewardDecision(Ads.onNativeFailure(attempt, 'plugin_missing'));
         return;
       }
 
       this.isAdLoading = true;
+      let abandoned = false;
       let listeners = [];
       const cleanup = () => {
         listeners.forEach((l) => {
@@ -1939,9 +2131,23 @@
         });
         listeners = [];
       };
+      const finishNative = (decision) => {
+        this.clearAdLoadTimer();
+        this.isAdLoading = false;
+        this.muteGameAudioForAd(false);
+        cleanup();
+        this.presentRewardDecision(decision);
+      };
+
+      this.clearAdLoadTimer();
+      this._adLoadTimer = setTimeout(() => {
+        if (attempt.phase !== 'loading') return;
+        abandoned = true;
+        console.warn('[AdMob] Rewarded load timed out');
+        finishNative(Ads.onTimeout(attempt));
+      }, Ads.LOAD_TIMEOUT_MS);
 
       try {
-        // Initialize AdMob once with testing mode flag tied to ADS_TEST_MODE
         if (!this.admobInitialized) {
           console.log(`[AdMob] Initializing AdMob plugin with initializeForTesting: ${ADS_TEST_MODE}...`);
           await AdMob.initialize({
@@ -1949,6 +2155,7 @@
           }).catch((e) => console.warn('[AdMob] initialize warning:', e));
           this.admobInitialized = true;
         }
+        if (abandoned || attempt.phase !== 'loading') return;
 
         const platform = window.Capacitor?.getPlatform ? window.Capacitor.getPlatform() : 'android';
         // When ADS_TEST_MODE is true, use ONLY Google's official test ad unit IDs
@@ -1966,192 +2173,148 @@
         const FailedToLoadEvent = window.RewardAdPluginEvents?.FailedToLoad || 'onRewardedVideoAdFailedToLoad';
         const FailedToShowEvent = window.RewardAdPluginEvents?.FailedToShow || 'onRewardedVideoAdFailedToShow';
 
-        let rewardEarned = false;
-
         const rewardListener = await AdMob.addListener(RewardedEvent, (rewardItem) => {
           console.log('[AdMob] Rewarded event received:', rewardItem);
-          rewardEarned = true;
-          this.grantAdReward(type);
+          const decision = Ads.onNativeReward(attempt);
+          if (decision.phase === 'settled') finishNative(decision);
         }).catch(() => null);
         if (rewardListener) listeners.push(rewardListener);
 
         const dismissListener = await AdMob.addListener(DismissedEvent, () => {
           console.log('[AdMob] Dismissed event received');
-          cleanup();
-          if (!rewardEarned) {
-            this.cancelRewardedAd();
-          }
+          // Let a reward callback delivered in the same turn win.
+          setTimeout(() => {
+            if (attempt.phase === 'settled') return;
+            const decision = Ads.onAdDismissed(attempt);
+            if (decision.phase === 'settled') finishNative(decision);
+          }, 0);
         }).catch(() => null);
         if (dismissListener) listeners.push(dismissListener);
 
+        const failLoadListener = await AdMob.addListener(FailedToLoadEvent, (err) => {
+          console.warn('[AdMob] FailedToLoad:', err);
+          if (attempt.phase === 'settled') return;
+          abandoned = true;
+          finishNative(Ads.onNativeFailure(attempt, 'error'));
+        }).catch(() => null);
+        if (failLoadListener) listeners.push(failLoadListener);
+
         const failShowListener = await AdMob.addListener(FailedToShowEvent, (err) => {
           console.warn('[AdMob] FailedToShow:', err);
-          cleanup();
-          if (!rewardEarned) {
-            this.showFloatingBurst('Ad presentation failed');
-            this.cancelRewardedAd();
-          }
+          if (attempt.phase === 'settled') return;
+          abandoned = true;
+          finishNative(Ads.onNativeFailure(attempt, 'error'));
         }).catch(() => null);
         if (failShowListener) listeners.push(failShowListener);
 
         console.log(`[AdMob] Preparing rewarded video (adId: ${adUnitId}, isTesting: ${ADS_TEST_MODE})...`);
         await AdMob.prepareRewardVideoAd({ adId: adUnitId, isTesting: ADS_TEST_MODE });
+        if (abandoned || attempt.phase !== 'loading') return;
 
+        this.clearAdLoadTimer();
+        Ads.markShowing(attempt);
+        this.hideRewardStatus();
+        this.muteGameAudioForAd(true);
         console.log('[AdMob] Ad prepared successfully, showing reward video...');
         await AdMob.showRewardVideoAd();
       } catch (err) {
         console.error('[AdMob] Native ad load/show failed (error code/message):', err);
-        cleanup();
-        this.showFloatingBurst('Ad unavailable · Please try again later');
-        this.cancelRewardedAd();
-      } finally {
-        this.isAdLoading = false;
+        if (attempt.phase !== 'settled') {
+          abandoned = true;
+          finishNative(Ads.onNativeFailure(attempt, 'error'));
+        }
       }
     }
 
     showWebRewardedAd(type) {
       console.log('[Ad] showWebRewardedAd started, type:', type);
+      const Ads = this.rewardAdsApi();
+      if (!Ads) return;
+      const attempt = Ads.createAttempt(type);
+      this._rewardAttempt = attempt;
+      const started = Ads.beginLoad(attempt, { online: navigator.onLine !== false });
+      if (started.phase === 'settled') {
+        this.presentRewardDecision(started);
+        return;
+      }
+      this.presentRewardDecision(started);
+      this.clearAdLoadTimer();
+      this._adLoadTimer = setTimeout(() => {
+        if (this._rewardAttempt !== attempt || attempt.phase !== 'loading') return;
+        console.info('[Ad] rewarded load timed out');
+        this.presentRewardDecision(Ads.onTimeout(attempt));
+      }, Ads.LOAD_TIMEOUT_MS);
+
       try {
-        if (typeof window.adBreak === 'function') {
-          let adHandled = false;
-          // Watchdog: Give Google AdSense ample time (4500ms) to load its test ad iframe from Google servers
-          const safetyTimer = setTimeout(() => {
-            console.log('[Ad] safetyTimer fired, adHandled:', adHandled);
-            if (!adHandled) {
-              adHandled = true;
-              this.openRewardedAdModal(type);
-            }
-          }, 4500);
-
-          window.adBreak({
-            type: 'reward',
-            name: type,
-            beforeReward: (showAdFn) => {
-              console.log('[Ad] beforeReward called by Google');
-              adHandled = true;
-              clearTimeout(safetyTimer);
+        window.adBreak({
+          type: 'reward',
+          name: type,
+          beforeAd: () => this.muteGameAudioForAd(true),
+          afterAd: () => this.muteGameAudioForAd(false),
+          beforeReward: (showAdFn) => {
+            const ready = Ads.onBeforeReward(attempt);
+            if (!ready.callShow) return;
+            this.clearAdLoadTimer();
+            this.hideRewardStatus();
+            this.muteGameAudioForAd(true);
+            try {
               showAdFn();
-            },
-            adDismissed: () => {
-              console.log('[Ad] adDismissed called by Google');
-              adHandled = true;
-              clearTimeout(safetyTimer);
-              this.cancelRewardedAd();
-            },
-            adViewed: () => {
-              console.log('[Ad] adViewed called by Google');
-              adHandled = true;
-              clearTimeout(safetyTimer);
-              this.grantAdReward(type);
-            },
-            adBreakDone: (info) => {
-              console.log('[Ad] adBreakDone called by Google, info:', JSON.stringify(info));
-              clearTimeout(safetyTimer);
-              if (!adHandled) {
-                adHandled = true;
-                if (!info || info.breakStatus !== 'viewed') {
-                  this.openRewardedAdModal(type);
-                }
-              }
+            } catch (err) {
+              console.warn('[Ad] showAdFn failed:', err);
+              this.muteGameAudioForAd(false);
+              this.presentRewardDecision(Ads.onNativeFailure(attempt, 'error'));
             }
-          });
-          return;
-        }
-      } catch (e) {
-        console.error('[Ad] showWebRewardedAd error:', e);
-      }
-      this.openRewardedAdModal(type);
-    }
-
-    openRewardedAdModal(type) {
-      console.log('[Ad] openRewardedAdModal called, type:', type);
-      const isNative = typeof window.Capacitor?.isNativePlatform === 'function' && window.Capacitor.isNativePlatform();
-      if (isNative) {
-        console.warn('[Ad] Refusing to open simulated ad modal on native platform');
-        this.showFloatingBurst('Ad unavailable');
-        this.cancelRewardedAd();
-        return;
-      }
-      const overlay = document.getElementById('rewardedAdModal');
-      console.log('[Ad] overlay element exists:', !!overlay);
-      if (!overlay) {
-        this.grantAdReward(type);
-        return;
-      }
-
-      const category = document.getElementById('rewardedAdCategory');
-      const title = document.getElementById('rewardedAdTitle');
-      const subtitle = document.getElementById('rewardedAdSubtitle');
-      const timer = document.getElementById('adSimTimer');
-      const fill = document.getElementById('adProgressFill');
-      const note = document.getElementById('adStatusNote');
-      const claimBtn = document.getElementById('claimRewardBtn');
-      const closeBtn = document.getElementById('rewardedAdCloseBtn');
-
-      if (category) category.textContent = type === 'boost_2x' ? '⚡ 2X SPARKS REWARD' : '❤️‍🔥 REVIVE & CONTINUE REWARD';
-      if (title) title.textContent = 'SPONSORED VIDEO';
-      if (subtitle) subtitle.textContent = type === 'boost_2x'
-        ? 'Watch to the end to double all sparks on your next round!'
-        : 'Watch to the end to revive your streak with a +3s breather!';
-      if (claimBtn) claimBtn.classList.add('hidden');
-      if (closeBtn) closeBtn.style.opacity = '0.5';
-
-      overlay.classList.add('show');
-
-      let remaining = 5;
-      if (timer) timer.textContent = `${remaining}s`;
-      if (fill) fill.style.width = '0%';
-      if (note) note.textContent = `Reward unlocks in ${remaining}s...`;
-
-      if (this.adInterval) clearInterval(this.adInterval);
-      const startTime = Date.now();
-      const totalDuration = 5000;
-
-      this.adInterval = setInterval(() => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(100, (elapsed / totalDuration) * 100);
-        remaining = Math.max(0, Math.ceil((totalDuration - elapsed) / 1000));
-
-        if (timer) timer.textContent = `${remaining}s`;
-        if (fill) fill.style.width = `${progress}%`;
-        if (note) note.textContent = remaining > 0 ? `Reward unlocks in ${remaining}s...` : 'Reward Unlocked! ✨';
-
-        if (elapsed >= totalDuration) {
-          clearInterval(this.adInterval);
-          this.adInterval = null;
-          if (claimBtn) {
-            claimBtn.classList.remove('hidden');
-            claimBtn.focus();
+          },
+          adDismissed: () => {
+            this.clearAdLoadTimer();
+            this.muteGameAudioForAd(false);
+            this.presentRewardDecision(Ads.onAdDismissed(attempt));
+          },
+          adViewed: () => {
+            this.clearAdLoadTimer();
+            this.muteGameAudioForAd(false);
+            this.presentRewardDecision(Ads.onAdViewed(attempt));
+          },
+          adBreakDone: (info) => {
+            console.info('[Ad] adBreakDone', info && info.breakStatus);
+            this.clearAdLoadTimer();
+            this.muteGameAudioForAd(false);
+            this.presentRewardDecision(Ads.onBreakDone(attempt, info));
           }
-          if (closeBtn) closeBtn.style.opacity = '1';
-        }
-      }, 100);
+        });
+      } catch (err) {
+        console.error('[Ad] showWebRewardedAd error:', err);
+        this.clearAdLoadTimer();
+        this.presentRewardDecision(Ads.onNativeFailure(attempt, 'error'));
+      }
     }
 
     claimActiveReward() {
-      const overlay = document.getElementById('rewardedAdModal');
-      if (overlay) overlay.classList.remove('show');
-      if (this.adInterval) {
-        clearInterval(this.adInterval);
-        this.adInterval = null;
-      }
-      const type = this.pendingAdAction;
-      this.pendingAdAction = null;
-      this.grantAdReward(type);
+      // Older pages had a timer that granted a reward from a simulated video.
+      // Closing that control must not grant anything.
+      this.cancelRewardedAd();
     }
 
     cancelRewardedAd() {
+      this.clearAdLoadTimer();
       if (this.adInterval) {
         clearInterval(this.adInterval);
         this.adInterval = null;
-        this.showFloatingBurst('Ad skipped · Reward not earned');
       }
-      const overlay = document.getElementById('rewardedAdModal');
-      if (overlay) overlay.classList.remove('show');
+      const Ads = this.rewardAdsApi();
+      if (Ads && this._rewardAttempt && this._rewardAttempt.phase === 'loading') {
+        this.presentRewardDecision(Ads.onCancel(this._rewardAttempt));
+      } else {
+        this.hideRewardStatus();
+      }
       this.pendingAdAction = null;
     }
 
     grantAdReward(type) {
+      if (type !== 'boost_2x' && type !== 'revive') return;
+      if (this._rewardGrantToken && this._rewardGrantToken === this._rewardAttempt) return;
+      this._rewardGrantToken = this._rewardAttempt;
+      this.pendingAdAction = null;
       if (type === 'boost_2x') {
         this.state.nextRound2xBoost = true;
         this.saveState();
