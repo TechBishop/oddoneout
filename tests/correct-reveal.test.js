@@ -61,5 +61,5 @@ test('correct popup is wired for 2.5s and wrong answers stay on the result card'
   assert.match(wrong, /explainIntruder/);
   assert.match(wrong, /explainReason/);
   assert.doesNotMatch(wrong, /triggerWinFeedback/);
-  assert.match(app, /const ADS_TEST_MODE = true/);
+  assert.match(app, /const ADS_TEST_MODE = false/);
 });
