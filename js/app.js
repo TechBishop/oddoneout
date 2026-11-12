@@ -596,19 +596,19 @@
           $('howtoCurveTag').textContent = '15s ➔ 5.0s';
           $('howtoCurveBody').innerHTML =
             '• <b>Relaxed Pace (15s down to 5s):</b> Extra time on every round.<br>' +
-            '• <b>Sparks:</b> +10 per correct answer, +50 bonus every 5 streak, +100 for a new personal best!';
+            '• <b>Sparks:</b> +3 to +7 per correct answer (scales with difficulty), +10 bonus every 5 streak, +35 for a new personal best!';
         } else if (pace === 'blitz') {
           $('howtoCurveTag').textContent = '7s ➔ 3.0s';
           $('howtoCurveBody').innerHTML =
             '• <b>Fast Blitz (7s down to 3s):</b> High speed from round one.<br>' +
-            '• <b>Sparks:</b> +10 per correct answer, +50 bonus every 5 streak, +100 for a new personal best!';
+            '• <b>Sparks:</b> +8 to +20 per correct answer (scales with difficulty), +25 bonus every 5 streak, +50 for a new personal best!';
         } else {
           $('howtoCurveTag').textContent = '12s ➔ 3.5s';
           $('howtoCurveBody').innerHTML =
             '• <b>Early Rounds (12s–10s):</b> Easy words with clear differences.<br>' +
             '• <b>Mid Streak (9s–7s):</b> Closer topics that test your quick thinking.<br>' +
             '• <b>High Streak (6s–3.5s):</b> Fast pace for serious focus.<br>' +
-            '• <b>Sparks:</b> +10 per correct answer, +50 bonus every 5 streak, +100 for a new personal best!';
+            '• <b>Sparks:</b> +5 to +13 per correct answer (scales with difficulty), +15 bonus every 5 streak, +35 for a new personal best!';
         }
       }
 
